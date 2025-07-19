@@ -7,10 +7,15 @@ namespace ClubManager
 {
     public partial class App : Application
     {
+        public static IThemeService ThemeService { get; private set; } = null!;
+
         private void Application_Startup(object sender, StartupEventArgs e)
         {
             try
             {
+                // Inicializar servicio de temas PRIMERO
+                ThemeService = new ThemeService();
+
                 // Verificar licencia al inicio
                 var licenseService = new LicenseService();
                 licenseService.LoadSavedLicense();

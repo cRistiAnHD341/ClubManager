@@ -38,6 +38,9 @@ namespace ClubManager.ViewModels
             _licenseService = new LicenseService();
             _dbContext = new ClubDbContext();
 
+            // Obtener referencia al servicio de temas
+            ThemeService = App.ThemeService;
+
             InitializeCommands();
             InitializeTimer();
             InitializeDatabase();
@@ -50,6 +53,8 @@ namespace ClubManager.ViewModels
         }
 
         #region Properties
+
+        public IThemeService ThemeService { get; }
 
         public object? CurrentView
         {
@@ -123,7 +128,7 @@ namespace ClubManager.ViewModels
             set { _canEdit = value; OnPropertyChanged(); }
         }
 
-        public string? ClubLogo { get; set; } = null; // Se cargará desde configuración
+        public string? ClubLogo { get; set; } = null;
 
         #endregion
 
@@ -408,37 +413,7 @@ namespace ClubManager.ViewModels
         #endregion
     }
 
-    // Placeholder Views - se implementarán en los siguientes pasos
-    public class DashboardView : System.Windows.Controls.UserControl
-    {
-        public DashboardView()
-        {
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = "🏠 Dashboard - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
-            };
-        }
-    }
-
-    public class AbonadosView : System.Windows.Controls.UserControl
-    {
-        public AbonadosView()
-        {
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = "👥 Gestión de Abonados - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
-            };
-        }
-    }
-
+    // Placeholder Views - se implementarán después
     public class TiposAbonoView : System.Windows.Controls.UserControl
     {
         public TiposAbonoView()
@@ -449,7 +424,6 @@ namespace ClubManager.ViewModels
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
             };
         }
     }
@@ -460,12 +434,13 @@ namespace ClubManager.ViewModels
         {
             Content = new System.Windows.Controls.TextBlock
             {
-                Text = "🏢 Gestores - Próximamente",
+                Text = "🏢 Gestores - Cargando...",
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
             };
+            ((System.Windows.Controls.TextBlock)Content).SetResourceReference(
+                System.Windows.Controls.TextBlock.ForegroundProperty, "ForegroundBrush");
         }
     }
 
@@ -479,23 +454,9 @@ namespace ClubManager.ViewModels
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
             };
-        }
-    }
-
-    public class UsuariosView : System.Windows.Controls.UserControl
-    {
-        public UsuariosView()
-        {
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = "👤 Gestión de Usuarios - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
-            };
+            ((System.Windows.Controls.TextBlock)Content).SetResourceReference(
+                System.Windows.Controls.TextBlock.ForegroundProperty, "ForegroundBrush");
         }
     }
 
@@ -509,42 +470,9 @@ namespace ClubManager.ViewModels
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 24,
-                Foreground = System.Windows.Media.Brushes.White
             };
-        }
-    }
-
-    public class NewSeasonWindow : Window
-    {
-        public NewSeasonWindow()
-        {
-            Title = "Nueva Temporada";
-            Width = 400;
-            Height = 200;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = "Ventana de Nueva Temporada - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-        }
-    }
-
-    public class SettingsWindow : Window
-    {
-        public SettingsWindow()
-        {
-            Title = "Configuración";
-            Width = 500;
-            Height = 400;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = "Ventana de Configuración - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            ((System.Windows.Controls.TextBlock)Content).SetResourceReference(
+                System.Windows.Controls.TextBlock.ForegroundProperty, "ForegroundBrush");
         }
     }
 }

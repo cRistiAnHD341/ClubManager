@@ -3,116 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding WindowTitle}" Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
-        Background="#FF2D2D30"
+        Background="{DynamicResource BackgroundBrush}"
         WindowState="Maximized">
-
-    <Window.Resources>
-        <!-- Estilos modernos -->
-        <Style x:Key="ModernButton" TargetType="Button">
-            <Setter Property="Background" Value="#FF007ACC"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="5"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" 
-                                            VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FF005A9E"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FF004578"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#FF6C757D"/>
-                                <Setter Property="Foreground" Value="#FFAAAAAA"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="MenuButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="20,15"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
-                                            VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FF3F3F46"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FF007ACC"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DataGridStyle" TargetType="DataGrid">
-            <Setter Property="Background" Value="#FF1E1E1E"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#FF007ACC"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#FF3F3F46"/>
-            <Setter Property="RowBackground" Value="#FF1E1E1E"/>
-            <Setter Property="AlternatingRowBackground" Value="#FF2D2D30"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="CanUserReorderColumns" Value="False"/>
-            <Setter Property="CanUserResizeRows" Value="False"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-        </Style>
-
-        <Style x:Key="DataGridColumnHeaderStyle" TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#FF007ACC"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="BorderThickness" Value="0,0,1,0"/>
-            <Setter Property="BorderBrush" Value="#FF005A9E"/>
-        </Style>
-
-        <Style x:Key="StatusBarStyle" TargetType="StatusBar">
-            <Setter Property="Background" Value="#FF1E1E1E"/>
-            <Setter Property="Foreground" Value="White"/>
-        </Style>
-
-        <Style x:Key="TitleLabel" TargetType="Label">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-        </Style>
-    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -126,7 +18,9 @@
         </Grid.ColumnDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="#FF1E1E1E" Padding="20,15">
+        <Border Grid.Row="0" Grid.ColumnSpan="2" 
+                Background="{DynamicResource HeaderBackgroundBrush}" 
+                Padding="20,15">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -138,8 +32,12 @@
                     <Image Source="{Binding ClubLogo}" Width="40" Height="40" Margin="0,0,15,0" 
                            RenderOptions.BitmapScalingMode="HighQuality"/>
                     <StackPanel VerticalAlignment="Center">
-                        <Label Content="{Binding ClubName}" Style="{StaticResource TitleLabel}" Margin="0"/>
-                        <TextBlock Text="{Binding CurrentSeason}" Foreground="#FFCCCCCC" FontSize="12"/>
+                        <Label Content="{Binding ClubName}" 
+                               Foreground="{DynamicResource ForegroundBrush}" 
+                               FontSize="18" FontWeight="Bold" Margin="0"/>
+                        <TextBlock Text="{Binding CurrentSeason}" 
+                                   Foreground="{DynamicResource MutedBrush}" 
+                                   FontSize="12"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -147,20 +45,35 @@
                     <Border Background="{Binding LicenseStatusColor}" CornerRadius="3" Padding="8,4" Margin="0,0,15,0">
                         <TextBlock Text="{Binding LicenseStatusText}" Foreground="White" FontSize="11" FontWeight="Bold"/>
                     </Border>
-                    <TextBlock Text="{Binding CurrentUser}" Foreground="#FFCCCCCC" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                    <Button Content="⚙️ Configuración" Style="{StaticResource ModernButton}" 
-                            Command="{Binding OpenSettingsCommand}" Margin="0,0,10,0"/>
-                    <Button Content="🚪 Salir" Style="{StaticResource ModernButton}" 
+                    <TextBlock Text="{Binding CurrentUser}" 
+                               Foreground="{DynamicResource MutedBrush}" 
+                               VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <Button Content="{Binding ThemeService.CurrentThemeText}" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ThemeService.ToggleThemeCommand}"
+                            ToolTip="Cambiar tema" 
+                            Margin="0,0,10,0"/>
+                    <Button Content="⚙️ Configuración" 
+                            Style="{StaticResource ModernButton}" 
+                            Command="{Binding OpenSettingsCommand}" 
+                            Margin="0,0,10,0"/>
+                    <Button Content="🚪 Salir" 
+                            Style="{StaticResource ModernButton}" 
                             Command="{Binding ExitCommand}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Menu Lateral -->
-        <Border Grid.Row="1" Grid.Column="0" Background="#FF1A1A1A" BorderBrush="#FF3F3F46" BorderThickness="0,0,1,0">
+        <Border Grid.Row="1" Grid.Column="0" 
+                Background="{DynamicResource SidebarBackgroundBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="0,0,1,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <Label Content="📊 GESTIÓN" Foreground="#FF007ACC" FontWeight="Bold" Margin="20,20,20,10"/>
+                    <Label Content="📊 GESTIÓN" 
+                           Foreground="{DynamicResource AccentBrush}" 
+                           FontWeight="Bold" Margin="20,20,20,10"/>
 
                     <Button Content="🏠 Dashboard" Style="{StaticResource MenuButton}" 
                             Command="{Binding ShowDashboardCommand}"/>
@@ -170,9 +83,11 @@
                             Command="{Binding ShowTiposAbonoCommand}"
                             IsEnabled="{Binding CanEdit}"/>
 
-                    <Separator Background="#FF3F3F46" Margin="10,15"/>
+                    <Separator Background="{DynamicResource BorderBrush}" Margin="10,15"/>
 
-                    <Label Content="👥 ORGANIZACIÓN" Foreground="#FF007ACC" FontWeight="Bold" Margin="20,10,20,10"/>
+                    <Label Content="👥 ORGANIZACIÓN" 
+                           Foreground="{DynamicResource AccentBrush}" 
+                           FontWeight="Bold" Margin="20,10,20,10"/>
 
                     <Button Content="🏢 Gestores" Style="{StaticResource MenuButton}" 
                             Command="{Binding ShowGestoresCommand}"
@@ -181,9 +96,11 @@
                             Command="{Binding ShowPeñasCommand}"
                             IsEnabled="{Binding CanEdit}"/>
 
-                    <Separator Background="#FF3F3F46" Margin="10,15"/>
+                    <Separator Background="{DynamicResource BorderBrush}" Margin="10,15"/>
 
-                    <Label Content="🔧 SISTEMA" Foreground="#FF007ACC" FontWeight="Bold" Margin="20,10,20,10"/>
+                    <Label Content="🔧 SISTEMA" 
+                           Foreground="{DynamicResource AccentBrush}" 
+                           FontWeight="Bold" Margin="20,10,20,10"/>
 
                     <Button Content="👤 Usuarios" Style="{StaticResource MenuButton}" 
                             Command="{Binding ShowUsuariosCommand}"
@@ -194,9 +111,11 @@
                             Command="{Binding NewSeasonCommand}"
                             IsEnabled="{Binding CanEdit}"/>
 
-                    <Separator Background="#FF3F3F46" Margin="10,15"/>
+                    <Separator Background="{DynamicResource BorderBrush}" Margin="10,15"/>
 
-                    <Label Content="🔐 LICENCIA" Foreground="#FF007ACC" FontWeight="Bold" Margin="20,10,20,10"/>
+                    <Label Content="🔐 LICENCIA" 
+                           Foreground="{DynamicResource AccentBrush}" 
+                           FontWeight="Bold" Margin="20,10,20,10"/>
 
                     <Button Content="🔑 Cambiar Licencia" Style="{StaticResource MenuButton}" 
                             Command="{Binding ChangeLicenseCommand}"/>
@@ -205,20 +124,30 @@
         </Border>
 
         <!-- Contenido Principal -->
-        <Border Grid.Row="1" Grid.Column="1" Background="#FF2D2D30" Margin="10">
+        <Border Grid.Row="1" Grid.Column="1" 
+                Background="{DynamicResource BackgroundBrush}" 
+                Margin="10">
             <ContentControl Content="{Binding CurrentView}"/>
         </Border>
 
         <!-- Status Bar -->
-        <StatusBar Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource StatusBarStyle}">
+        <StatusBar Grid.Row="2" Grid.ColumnSpan="2" 
+                   Background="{DynamicResource SecondaryBackgroundBrush}">
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}"/>
+                <TextBlock Text="{Binding StatusMessage}" 
+                           Foreground="{DynamicResource ForegroundBrush}"/>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding TotalAbonados, StringFormat='Total Abonados: {0}'}" Margin="0,0,20,0"/>
-                    <TextBlock Text="{Binding AbonadosActivos, StringFormat='Activos: {0}'}" Margin="0,0,20,0"/>
-                    <TextBlock Text="{Binding CurrentDateTime}" Margin="0,0,10,0"/>
+                    <TextBlock Text="{Binding TotalAbonados, StringFormat='Total Abonados: {0}'}" 
+                               Foreground="{DynamicResource ForegroundBrush}" 
+                               Margin="0,0,20,0"/>
+                    <TextBlock Text="{Binding AbonadosActivos, StringFormat='Activos: {0}'}" 
+                               Foreground="{DynamicResource ForegroundBrush}" 
+                               Margin="0,0,20,0"/>
+                    <TextBlock Text="{Binding CurrentDateTime}" 
+                               Foreground="{DynamicResource ForegroundBrush}" 
+                               Margin="0,0,10,0"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

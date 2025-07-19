@@ -4,136 +4,7 @@
         Title="Exportar Datos" Height="650" Width="800"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#FF2D2D30">
-
-    <Window.Resources>
-        <!-- Estilos modernos -->
-        <Style x:Key="ModernButton" TargetType="Button">
-            <Setter Property="Background" Value="#FF007ACC"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="15,10"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="5"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" 
-                                            VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FF005A9E"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FF004578"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="CancelButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#FF6C757D"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FF5A6268"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#FF495057"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#FF28A745"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FF218838"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#FF1E7E34"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ModernTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="BorderBrush" Value="#FF007ACC"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="5">
-                            <ScrollViewer x:Name="PART_ContentHost" 
-                                        Margin="{TemplateBinding Padding}"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ModernComboBox" TargetType="ComboBox">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="BorderBrush" Value="#FF007ACC"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
-
-        <Style x:Key="ModernCheckBox" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Margin" Value="0,5"/>
-        </Style>
-
-        <Style x:Key="ModernRadioButton" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Margin" Value="0,5"/>
-        </Style>
-
-        <Style x:Key="ModernLabel" TargetType="Label">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-
-        <Style x:Key="TitleLabel" TargetType="Label">
-            <Setter Property="Foreground" Value="#FF007ACC"/>
-            <Setter Property="FontSize" Value="24"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="SectionTitle" TargetType="Label">
-            <Setter Property="Foreground" Value="#FF007ACC"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,15,0,10"/>
-        </Style>
-
-        <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Height" Value="20"/>
-            <Setter Property="Background" Value="#FF3F3F46"/>
-            <Setter Property="Foreground" Value="#FF007ACC"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#FF007ACC"/>
-        </Style>
-    </Window.Resources>
+        Background="{DynamicResource BackgroundBrush}">
 
     <Grid Margin="30">
         <Grid.RowDefinitions>
@@ -147,7 +18,7 @@
             <Label Content="📤 Exportar Datos" Style="{StaticResource TitleLabel}"/>
             <TextBlock Text="Exporta los datos de abonados en diferentes formatos" 
                        HorizontalAlignment="Center" 
-                       Foreground="#FFCCCCCC" 
+                       Foreground="{DynamicResource MutedBrush}" 
                        FontSize="14" 
                        Margin="0,10,0,0"/>
         </StackPanel>
@@ -162,7 +33,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Columna Izquierda - Configuración -->
-                <Border Grid.Column="0" Background="#FF1E1E1E" CornerRadius="10" Padding="20">
+                <Border Grid.Column="0" Style="{StaticResource ModernBorder}">
                     <StackPanel>
                         <Label Content="⚙️ Configuración de Exportación" Style="{StaticResource SectionTitle}"/>
 
@@ -252,15 +123,16 @@
                 </Border>
 
                 <!-- Columna Derecha - Vista Previa y Opciones -->
-                <Border Grid.Column="2" Background="#FF1E1E1E" CornerRadius="10" Padding="20">
+                <Border Grid.Column="2" Style="{StaticResource ModernBorder}">
                     <StackPanel>
                         <Label Content="👀 Vista Previa" Style="{StaticResource SectionTitle}"/>
 
                         <!-- Resumen -->
-                        <Border Background="#FF3F3F46" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                        <Border Style="{StaticResource InfoBorder}" Margin="0,0,0,15">
                             <StackPanel>
                                 <TextBlock Text="{Binding ResumenExportacion}" 
-                                           Foreground="White" FontWeight="SemiBold" 
+                                           Foreground="{DynamicResource ForegroundBrush}" 
+                                           FontWeight="SemiBold" 
                                            TextWrapping="Wrap" LineHeight="20"/>
                             </StackPanel>
                         </Border>
@@ -306,13 +178,13 @@
                         <!-- Vista previa de columnas -->
                         <Label Content="📊 Columnas a exportar:" Style="{StaticResource SectionTitle}"/>
 
-                        <Border Background="#FF3F3F46" CornerRadius="5" Padding="10" Height="150">
+                        <Border Style="{StaticResource InfoBorder}" Height="150">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <ItemsControl ItemsSource="{Binding ColumnasSeleccionadas}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding}" 
-                                                       Foreground="White" 
+                                                       Foreground="{DynamicResource ForegroundBrush}" 
                                                        FontSize="12" 
                                                        Margin="0,2"/>
                                         </DataTemplate>
@@ -331,7 +203,7 @@
                                      Margin="0,5,0,10"/>
 
                         <TextBlock Text="{Binding ProgressText}"
-                                   Foreground="#FFCCCCCC"
+                                   Foreground="{DynamicResource MutedBrush}"
                                    HorizontalAlignment="Center"
                                    Visibility="{Binding ShowProgress}"/>
                     </StackPanel>

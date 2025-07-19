@@ -14,14 +14,20 @@ namespace ClubManager.Commands
             _canExecute = canExecute;
         }
 
-        public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
-
-        public void Execute(object? parameter) => _execute();
-
         public event EventHandler? CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object? parameter)
+        {
+            return _canExecute?.Invoke() ?? true;
+        }
+
+        public void Execute(object? parameter)
+        {
+            _execute();
         }
     }
 
@@ -36,27 +42,20 @@ namespace ClubManager.Commands
             _canExecute = canExecute;
         }
 
-        public bool CanExecute(object? parameter)
-        {
-            if (parameter is T typedParameter)
-                return _canExecute?.Invoke(typedParameter) ?? true;
-            if (parameter == null && typeof(T).IsClass)
-                return _canExecute?.Invoke(default(T)) ?? true;
-            return false;
-        }
-
-        public void Execute(object? parameter)
-        {
-            if (parameter is T typedParameter)
-                _execute(typedParameter);
-            else if (parameter == null && typeof(T).IsClass)
-                _execute(default(T));
-        }
-
         public event EventHandler? CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object? parameter)
+        {
+            return _canExecute?.Invoke((T?)parameter) ?? true;
+        }
+
+        public void Execute(object? parameter)
+        {
+            _execute((T?)parameter);
         }
     }
 }
