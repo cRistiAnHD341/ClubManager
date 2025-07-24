@@ -7,195 +7,81 @@ using ClubManager.Models;
 
 namespace ClubManager.Services
 {
-    public interface ILicenseService
-    {
-        LicenseInfo ValidateLicense(string licenseKey);
-        LicenseInfo GetCurrentLicenseInfo();
-        bool SetLicenseKey(string licenseKey);
-        void ClearLicense();
-        void LoadSavedLicense();
-    }
-
     public class LicenseService : ILicenseService
     {
+        private const string LICENSE_FILE = "club.license";
+        private const string PUBLIC_KEY_FILE = "public_key.xml";
         private LicenseInfo? _currentLicense;
-        private readonly string[] _publicKeyPaths;
+        private RSACryptoServiceProvider? _rsa;
 
         public LicenseService()
         {
-            // Buscar la clave pública en múltiples ubicaciones
-            _publicKeyPaths = new[]
-            {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "public_key.xml"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ClubManager", "public_key.xml"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "public_key.xml")
-            };
-        }
-
-        public LicenseInfo ValidateLicense(string licenseKey)
-        {
-            var licenseInfo = new LicenseInfo
-            {
-                IsValid = false,
-                IsExpired = true,
-                ErrorMessage = "Licencia inválida"
-            };
-
-            try
-            {
-                if (string.IsNullOrWhiteSpace(licenseKey))
-                {
-                    licenseInfo.ErrorMessage = "La clave de licencia no puede estar vacía";
-                    return licenseInfo;
-                }
-
-                // Buscar la clave pública en múltiples ubicaciones
-                string? publicKeyPath = FindPublicKey();
-                if (publicKeyPath == null)
-                {
-                    licenseInfo.ErrorMessage = "No se encontró la clave pública.\n\n" +
-                                             "Asegúrate de que el archivo 'public_key.xml' esté en:\n" +
-                                             "- La carpeta del programa\n" +
-                                             "- Documentos/ClubManager/\n" +
-                                             "- El escritorio\n\n" +
-                                             "O ejecuta primero el Generador de Claves.";
-                    return licenseInfo;
-                }
-
-                // Decodificar la licencia desde Base64
-                byte[] licenseBytes;
-                try
-                {
-                    licenseBytes = Convert.FromBase64String(licenseKey);
-                }
-                catch
-                {
-                    licenseInfo.ErrorMessage = "Formato de licencia inválido";
-                    return licenseInfo;
-                }
-
-                string licenseJson = Encoding.UTF8.GetString(licenseBytes);
-                SignedLicense? signedLicense = JsonSerializer.Deserialize<SignedLicense>(licenseJson);
-
-                if (signedLicense == null || string.IsNullOrEmpty(signedLicense.Data) || string.IsNullOrEmpty(signedLicense.Signature))
-                {
-                    licenseInfo.ErrorMessage = "Estructura de licencia inválida";
-                    return licenseInfo;
-                }
-
-                // Verificar la firma RSA
-                if (!VerifySignature(signedLicense.Data, signedLicense.Signature, publicKeyPath))
-                {
-                    licenseInfo.ErrorMessage = "Firma de licencia inválida";
-                    return licenseInfo;
-                }
-
-                // Decodificar los datos de la licencia
-                byte[] dataBytes = Convert.FromBase64String(signedLicense.Data);
-                string dataJson = Encoding.UTF8.GetString(dataBytes);
-                LicenseData? licenseData = JsonSerializer.Deserialize<LicenseData>(dataJson);
-
-                if (licenseData == null)
-                {
-                    licenseInfo.ErrorMessage = "Datos de licencia inválidos";
-                    return licenseInfo;
-                }
-
-                // Verificar fecha de expiración
-                bool isExpired = DateTime.Now > licenseData.ExpirationDate;
-
-                licenseInfo.IsValid = true;
-                licenseInfo.IsExpired = isExpired;
-                licenseInfo.ExpirationDate = licenseData.ExpirationDate;
-                licenseInfo.ClubName = licenseData.ClubName;
-                licenseInfo.ErrorMessage = isExpired ? "La licencia ha expirado" : "Licencia válida";
-
-                return licenseInfo;
-            }
-            catch (Exception ex)
-            {
-                licenseInfo.ErrorMessage = $"Error al validar la licencia: {ex.Message}";
-                return licenseInfo;
-            }
-        }
-
-        private string? FindPublicKey()
-        {
-            foreach (string path in _publicKeyPaths)
-            {
-                if (File.Exists(path))
-                {
-                    return path;
-                }
-            }
-            return null;
-        }
-
-        private bool VerifySignature(string data, string signature, string publicKeyPath)
-        {
-            try
-            {
-                string publicKeyXml = File.ReadAllText(publicKeyPath);
-                using var rsa = new RSACryptoServiceProvider();
-                rsa.FromXmlString(publicKeyXml);
-
-                byte[] dataBytes = Convert.FromBase64String(data);
-                byte[] signatureBytes = Convert.FromBase64String(signature);
-
-                return rsa.VerifyData(dataBytes, CryptoConfig.MapNameToOID("SHA256"), signatureBytes);
-            }
-            catch
-            {
-                return false;
-            }
+            InitializeRSA();
         }
 
         public LicenseInfo GetCurrentLicenseInfo()
         {
+            if (_currentLicense == null)
+            {
+                LoadSavedLicense();
+            }
+
             return _currentLicense ?? new LicenseInfo
             {
                 IsValid = false,
                 IsExpired = true,
-                ErrorMessage = "No hay licencia configurada"
+                Status = "Sin licencia",
+                ErrorMessage = "No hay licencia instalada"
             };
         }
 
-        public bool SetLicenseKey(string licenseKey)
+        public bool ActivateLicense(string licenseKey)
         {
-            var licenseInfo = ValidateLicense(licenseKey);
-            _currentLicense = licenseInfo;
-
-            if (licenseInfo.IsValid)
-            {
-                // Guardar la licencia en un archivo para persistencia
-                try
-                {
-                    string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "current_license.lic");
-                    File.WriteAllText(licensePath, licenseKey);
-                }
-                catch
-                {
-                    // Si no se puede guardar, no es crítico
-                }
-            }
-
-            return licenseInfo.IsValid;
-        }
-
-        public void ClearLicense()
-        {
-            _currentLicense = null;
             try
             {
-                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "current_license.lic");
-                if (File.Exists(licensePath))
+                if (string.IsNullOrWhiteSpace(licenseKey))
                 {
-                    File.Delete(licensePath);
+                    _currentLicense = new LicenseInfo
+                    {
+                        IsValid = false,
+                        Status = "Clave vacía",
+                        ErrorMessage = "La clave de licencia no puede estar vacía"
+                    };
+                    return false;
                 }
+
+                // Intentar validar con el nuevo formato RSA
+                var licenseData = ValidateRSALicense(licenseKey);
+                if (licenseData != null)
+                {
+                    return ProcessValidLicense(licenseData, licenseKey);
+                }
+
+                // Si falla RSA, intentar el formato antiguo (compatibilidad)
+                licenseData = ValidateLegacyLicense(licenseKey);
+                if (licenseData != null)
+                {
+                    return ProcessValidLicense(licenseData, licenseKey);
+                }
+
+                // Si ningún formato funciona
+                _currentLicense = new LicenseInfo
+                {
+                    IsValid = false,
+                    Status = "Formato inválido",
+                    ErrorMessage = "La clave de licencia tiene un formato inválido o no se pudo verificar"
+                };
+                return false;
             }
-            catch
+            catch (Exception ex)
             {
-                // Si no se puede eliminar, no es crítico
+                _currentLicense = new LicenseInfo
+                {
+                    IsValid = false,
+                    Status = "Error",
+                    ErrorMessage = $"Error al procesar licencia: {ex.Message}"
+                };
+                return false;
             }
         }
 
@@ -203,21 +89,317 @@ namespace ClubManager.Services
         {
             try
             {
-                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "current_license.lic");
-                if (File.Exists(licensePath))
+                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LICENSE_FILE);
+
+                if (!File.Exists(licensePath))
                 {
-                    string licenseKey = File.ReadAllText(licensePath);
-                    if (!string.IsNullOrWhiteSpace(licenseKey))
+                    _currentLicense = new LicenseInfo
                     {
-                        _currentLicense = ValidateLicense(licenseKey);
+                        IsValid = false,
+                        Status = "No instalada",
+                        ErrorMessage = "No hay licencia instalada"
+                    };
+                    return;
+                }
+
+                string licenseKey = File.ReadAllText(licensePath);
+                ActivateLicense(licenseKey);
+            }
+            catch (Exception ex)
+            {
+                _currentLicense = new LicenseInfo
+                {
+                    IsValid = false,
+                    Status = "Error de carga",
+                    ErrorMessage = $"Error al cargar licencia: {ex.Message}"
+                };
+            }
+        }
+
+        private void InitializeRSA()
+        {
+            try
+            {
+                _rsa = new RSACryptoServiceProvider();
+
+                // Buscar clave pública en varias ubicaciones
+                string publicKeyXml = FindPublicKey();
+
+                if (!string.IsNullOrEmpty(publicKeyXml))
+                {
+                    _rsa.FromXmlString(publicKeyXml);
+                    System.Diagnostics.Debug.WriteLine("RSA inicializado correctamente con clave pública");
+                }
+                else
+                {
+                    // Sin clave pública, solo funcionará el modo legacy
+                    _rsa?.Dispose();
+                    _rsa = null;
+                    System.Diagnostics.Debug.WriteLine("No se encontró clave pública, solo modo legacy disponible");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error inicializando RSA: {ex.Message}");
+                _rsa?.Dispose();
+                _rsa = null;
+            }
+        }
+
+        private string FindPublicKey()
+        {
+            // Lista de ubicaciones donde buscar
+            var locations = new[]
+            {
+                // Carpeta de la aplicación
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, PUBLIC_KEY_FILE),
+                // Documentos/ClubManager
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ClubManager", PUBLIC_KEY_FILE),
+                // %AppData%/ClubManager
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClubManager", PUBLIC_KEY_FILE)
+            };
+
+            foreach (var location in locations)
+            {
+                try
+                {
+                    if (File.Exists(location))
+                    {
+                        string content = File.ReadAllText(location);
+                        if (!string.IsNullOrWhiteSpace(content))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Clave pública encontrada en: {location}");
+                            return content;
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error leyendo {location}: {ex.Message}");
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine("No se encontró clave pública en ninguna ubicación");
+            return string.Empty;
+        }
+
+        private LicenseData? ValidateRSALicense(string licenseKey)
+        {
+            try
+            {
+                if (_rsa == null)
+                {
+                    // Debug: RSA no inicializado
+                    System.Diagnostics.Debug.WriteLine("RSA no inicializado - clave pública no encontrada");
+                    return null;
+                }
+
+                // Limpiar formato
+                licenseKey = licenseKey.Replace("-", "").Replace(" ", "").Replace("\n", "").Replace("\r", "").Trim();
+
+                // Debug
+                System.Diagnostics.Debug.WriteLine($"Validando licencia RSA, longitud: {licenseKey.Length}");
+
+                // Decodificar la licencia base64
+                byte[] licenseBytes = Convert.FromBase64String(licenseKey);
+                string licenseJson = Encoding.UTF8.GetString(licenseBytes);
+
+                // Debug
+                System.Diagnostics.Debug.WriteLine($"JSON decodificado: {licenseJson}");
+
+                // Deserializar la estructura firmada
+                var signedLicense = JsonSerializer.Deserialize<SignedLicense>(licenseJson);
+                if (signedLicense == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error: No se pudo deserializar SignedLicense");
+                    return null;
+                }
+
+                // Verificar la firma RSA
+                byte[] dataBytes = Convert.FromBase64String(signedLicense.Data);
+                byte[] signature = Convert.FromBase64String(signedLicense.Signature);
+
+                // Debug
+                System.Diagnostics.Debug.WriteLine($"Datos: {dataBytes.Length} bytes, Firma: {signature.Length} bytes");
+
+                bool isValidSignature = _rsa.VerifyData(dataBytes, CryptoConfig.MapNameToOID("SHA256"), signature);
+
+                System.Diagnostics.Debug.WriteLine($"Firma válida: {isValidSignature}");
+
+                if (!isValidSignature)
+                    return null;
+
+                // Deserializar los datos de la licencia
+                string licenseDataJson = Encoding.UTF8.GetString(dataBytes);
+                System.Diagnostics.Debug.WriteLine($"JSON de datos de licencia: {licenseDataJson}");
+
+                var licenseData = JsonSerializer.Deserialize<GeneratorLicenseData>(licenseDataJson);
+
+                if (licenseData == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error: No se pudo deserializar GeneratorLicenseData");
+                    return null;
+                }
+
+                // Convertir al formato interno
+                return new LicenseData
+                {
+                    ClubName = licenseData.ClubName ?? "",
+                    LicenseId = Guid.NewGuid().ToString(), // Generar ID único
+                    ExpirationDate = licenseData.ExpirationDate,
+                    Signature = "RSA_VERIFIED" // Marcar como verificado por RSA
+                };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en ValidateRSALicense: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+        private LicenseData? ValidateLegacyLicense(string licenseKey)
+        {
+            try
+            {
+                // Limpiar formato
+                licenseKey = licenseKey.Replace("-", "").Replace(" ", "").Replace("\n", "").Replace("\r", "");
+
+                // Verificar longitud mínima
+                if (licenseKey.Length < 50)
+                    return null;
+
+                // Decodificar base64
+                byte[] data = Convert.FromBase64String(licenseKey);
+                string json = Encoding.UTF8.GetString(data);
+
+                // Deserializar JSON
+                var licenseData = JsonSerializer.Deserialize<LegacyLicenseData>(json);
+                if (licenseData == null)
+                    return null;
+
+                // Verificar firma legacy
+                if (!VerifyLegacySignature(licenseData))
+                    return null;
+
+                // Convertir al formato interno
+                return new LicenseData
+                {
+                    ClubName = licenseData.ClubName,
+                    LicenseId = licenseData.LicenseId,
+                    ExpirationDate = licenseData.ExpirationDate,
+                    Signature = licenseData.Signature
+                };
             }
             catch
             {
-                // Si hay error cargando, simplemente no hay licencia
-                _currentLicense = null;
+                return null;
             }
         }
+
+        private bool VerifyLegacySignature(LegacyLicenseData licenseData)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(licenseData.ClubName) ||
+                    string.IsNullOrWhiteSpace(licenseData.LicenseId))
+                    return false;
+
+                string dataToHash = $"{licenseData.ClubName}|{licenseData.LicenseId}|{licenseData.ExpirationDate?.ToString("yyyy-MM-dd")}";
+                string calculatedHash = ComputeSimpleHash(dataToHash);
+
+                return calculatedHash == licenseData.Signature;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string ComputeSimpleHash(string input)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                byte[] hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input + "ClubManagerSecretKey"));
+                return Convert.ToBase64String(hashedBytes).Substring(0, 16);
+            }
+        }
+
+        private bool ProcessValidLicense(LicenseData licenseData, string licenseKey)
+        {
+            // Verificar que no esté expirada
+            var isExpired = licenseData.ExpirationDate.HasValue &&
+                           licenseData.ExpirationDate.Value < DateTime.Now; // Usar DateTime.Now para incluir hora
+
+            _currentLicense = new LicenseInfo
+            {
+                IsValid = !isExpired,
+                IsExpired = isExpired,
+                ClubName = licenseData.ClubName,
+                ExpirationDate = licenseData.ExpirationDate,
+                Status = isExpired ? "Expirada" : "Válida",
+                ErrorMessage = isExpired ? "La licencia ha expirado" : ""
+            };
+
+            // Guardar licencia si es válida
+            if (_currentLicense.IsValid)
+            {
+                SaveLicense(licenseKey);
+            }
+
+            return _currentLicense.IsValid;
+        }
+
+        private void SaveLicense(string licenseKey)
+        {
+            try
+            {
+                string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LICENSE_FILE);
+                File.WriteAllText(licensePath, licenseKey);
+            }
+            catch
+            {
+                // Si no se puede guardar, no es crítico
+            }
+        }
+
+        public void Dispose()
+        {
+            _rsa?.Dispose();
+        }
+
+        #region Data Classes
+
+        private class LicenseData
+        {
+            public string ClubName { get; set; } = "";
+            public string LicenseId { get; set; } = "";
+            public DateTime? ExpirationDate { get; set; }
+            public string Signature { get; set; } = "";
+        }
+
+        private class LegacyLicenseData
+        {
+            public string ClubName { get; set; } = "";
+            public string LicenseId { get; set; } = "";
+            public DateTime? ExpirationDate { get; set; }
+            public string Signature { get; set; } = "";
+        }
+
+        private class GeneratorLicenseData
+        {
+            public string ClubName { get; set; } = "";
+            public DateTime ExpirationDate { get; set; }
+            public DateTime GenerationDate { get; set; }
+            public string Version { get; set; } = "";
+        }
+
+        private class SignedLicense
+        {
+            public string Data { get; set; } = "";
+            public string Signature { get; set; } = "";
+        }
+
+        #endregion
     }
 }

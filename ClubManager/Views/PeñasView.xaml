@@ -1,0 +1,208 @@
+﻿<UserControl x:Class="ClubManager.Views.PeñasView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BackgroundBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource ModernBorder}" CornerRadius="8,8,0,0" Margin="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <Label Content="🎪 Gestión de Peñas" 
+                           Foreground="{DynamicResource ForegroundBrush}" 
+                           FontSize="20" FontWeight="Bold" Margin="0"/>
+                    <TextBlock Text="{Binding SubTitle}" 
+                               Foreground="{DynamicResource MutedBrush}" 
+                               FontSize="14"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="➕ Nueva Peña" 
+                            Style="{StaticResource SuccessButton}"
+                            Command="{Binding NewPeñaCommand}"
+                            IsEnabled="{Binding CanEdit}"
+                            Margin="0,0,10,0"/>
+                    <Button Content="📊 Estadísticas" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ShowStatsCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Filtros y Búsqueda -->
+        <Border Grid.Row="1" 
+                Background="{DynamicResource BorderBrush}" 
+                Padding="20,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <Label Content="🔍 Buscar:" 
+                           Foreground="{DynamicResource ForegroundBrush}" 
+                           FontSize="12" Margin="0"/>
+                    <TextBox Style="{StaticResource ModernTextBox}"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Buscar por nombre de peña"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Content="🗑️ Limpiar" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ClearFiltersCommand}"
+                            Margin="0,0,10,0"/>
+                    <Button Content="📤 Exportar" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ExportCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- DataGrid -->
+        <Border Grid.Row="2" Style="{StaticResource ModernBorder}" CornerRadius="0,0,8,8" Margin="0,0,0,0">
+            <DataGrid x:Name="dgPeñas"
+                      Style="{StaticResource DataGridStyle}"
+                      ItemsSource="{Binding PeñasFiltered}"
+                      SelectedItem="{Binding SelectedPeña}">
+
+                <DataGrid.Columns>
+                    <!-- ID -->
+                    <DataGridTextColumn Header="ID" 
+                                        Binding="{Binding Id}" 
+                                        Width="60"/>
+
+                    <!-- Nombre -->
+                    <DataGridTextColumn Header="Nombre de la Peña" 
+                                        Binding="{Binding Nombre}" 
+                                        Width="250"/>
+
+                    <!-- Total Miembros -->
+                    <DataGridTemplateColumn Header="Total Miembros" Width="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource AccentBrush}" 
+                                        CornerRadius="12" Padding="8,4">
+                                    <TextBlock Text="{Binding TotalAbonados}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Miembros Activos -->
+                    <DataGridTemplateColumn Header="Activos" Width="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SuccessBrush}" 
+                                        CornerRadius="12" Padding="8,4">
+                                    <TextBlock Text="{Binding AbonadosActivos}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Ingresos Generados -->
+                    <DataGridTemplateColumn Header="Ingresos Generados" Width="150">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource WarningBrush}" 
+                                        CornerRadius="12" Padding="8,4">
+                                    <TextBlock Text="{Binding IngresosGenerados, StringFormat='{}{0:C}'}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Estado -->
+                    <DataGridTemplateColumn Header="Estado" Width="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding ColorEstado}" 
+                                        CornerRadius="4" Padding="8,4">
+                                    <TextBlock Text="{Binding EstadoPeña}" 
+                                               Foreground="White" 
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Porcentaje del Club -->
+                    <DataGridTextColumn Header="% del Club" 
+                                        Binding="{Binding PorcentajeDelClub, StringFormat='{}{0:F1}%'}" 
+                                        Width="100"/>
+
+                    <!-- Acciones -->
+                    <DataGridTemplateColumn Header="Acciones" Width="200">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Button Content="✏️" 
+                                            Style="{StaticResource ModernButton}"
+                                            Command="{Binding DataContext.EditPeñaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            ToolTip="Editar peña"
+                                            Margin="2" Padding="6,4"/>
+                                    <Button Content="👥" 
+                                            Style="{StaticResource ModernButton}"
+                                            Command="{Binding DataContext.ViewAbonadosCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="Ver miembros"
+                                            Margin="2" Padding="6,4"/>
+                                    <Button Content="🗑️" 
+                                            Style="{StaticResource DangerButton}"
+                                            Command="{Binding DataContext.DeletePeñaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            ToolTip="Eliminar peña"
+                                            Margin="2" Padding="6,4"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

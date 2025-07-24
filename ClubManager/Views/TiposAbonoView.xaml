@@ -1,0 +1,167 @@
+﻿<UserControl x:Class="ClubManager.Views.TiposAbonoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BackgroundBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource ModernBorder}" 
+                CornerRadius="8,8,0,0" Margin="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <Label Content="🎫 Gestión de Tipos de Abono" 
+                           Foreground="{DynamicResource ForegroundBrush}" 
+                           FontSize="20" FontWeight="Bold" Margin="0"/>
+                    <TextBlock Text="{Binding SubTitle}" 
+                               Foreground="{DynamicResource MutedBrush}" 
+                               FontSize="14"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="➕ Nuevo Tipo" 
+                            Style="{StaticResource SuccessButton}"
+                            Command="{Binding NewTipoAbonoCommand}"
+                            IsEnabled="{Binding CanEdit}"
+                            Margin="0,0,10,0"/>
+                    <Button Content="📊 Estadísticas" 
+                            Style="{StaticResource InfoButton}"
+                            Command="{Binding ShowStatsCommand}"
+                            Margin="0,0,10,0"/>
+                    <Button Content="📄 Exportar" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ExportCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Filtros -->
+        <Border Grid.Row="1" Style="{StaticResource ModernBorder}" 
+                CornerRadius="0" Margin="0,0,0,1">
+            <Grid Margin="15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0" 
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         Height="35"
+                         Tag="Buscar por nombre o descripción..."/>
+
+                <Button Grid.Column="1" 
+                        Content="🗑️ Limpiar"
+                        Style="{StaticResource WarningButton}"
+                        Command="{Binding ClearFiltersCommand}"
+                        Height="35" Width="80" Margin="10,0,0,0"/>
+            </Grid>
+        </Border>
+
+        <!-- Lista de Tipos -->
+        <DataGrid Grid.Row="2" 
+                  ItemsSource="{Binding TiposAbonoFiltered}"
+                  SelectedItem="{Binding SelectedTipoAbono}"
+                  Style="{StaticResource DataGridStyle}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True">
+
+            <DataGrid.Columns>
+                <!-- Nombre -->
+                <DataGridTextColumn Header="Nombre" 
+                                    Binding="{Binding Nombre}"
+                                    Width="200"/>
+
+                <!-- Descripción -->
+                <DataGridTextColumn Header="Descripción" 
+                                    Binding="{Binding Descripcion}"
+                                    Width="300"/>
+
+                <!-- Precio -->
+                <DataGridTemplateColumn Header="Precio" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding PrecioFormateado}" 
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource SuccessBrush}"
+                                       HorizontalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Total Abonados -->
+                <DataGridTemplateColumn Header="Abonados" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding TotalAbonados, Converter={StaticResource NumberToColorConverter}}" 
+                                    CornerRadius="12" Padding="8,4">
+                                <TextBlock Text="{Binding TotalAbonados}" 
+                                           Foreground="White" 
+                                           FontSize="11" FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Ingresos -->
+                <DataGridTextColumn Header="Ingresos Est." 
+                                    Binding="{Binding IngresosFormateados}"
+                                    Width="120"/>
+
+                <!-- Fecha Creación -->
+                <DataGridTextColumn Header="Fecha Creación" 
+                                    Binding="{Binding FechaCreacion, StringFormat=dd/MM/yyyy}"
+                                    Width="110"/>
+
+                <!-- Acciones -->
+                <DataGridTemplateColumn Header="Acciones" Width="200">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏️" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.EditTipoAbonoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Editar"
+                                        Margin="2"/>
+                                
+                                <Button Content="👥" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ViewAbonadosCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Ver Abonados"
+                                        Margin="2"/>
+                                
+                                <Button Content="📊" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ShowStatsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        ToolTip="Estadísticas"
+                                        Margin="2"/>
+                                
+                                <Button Content="🗑️" 
+                                        Style="{StaticResource DangerIconButton}"
+                                        Command="{Binding DataContext.DeleteTipoAbonoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Eliminar"
+                                        Margin="2"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

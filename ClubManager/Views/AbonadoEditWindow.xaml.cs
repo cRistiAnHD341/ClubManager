@@ -30,5 +30,14 @@ namespace ClubManager.Views
             DialogResult = false;
             Close();
         }
+
+        private void Window_Closed(object sender, System.EventArgs e)
+        {
+            // Limpiar recursos al cerrar
+            if (DataContext is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
     }
 }

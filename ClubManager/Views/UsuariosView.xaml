@@ -1,14 +1,7 @@
 ﻿<UserControl x:Class="ClubManager.Views.UsuariosView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
-             xmlns:local="clr-namespace:ClubManager.Views"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource BackgroundBrush}">
-
-    <UserControl.Resources>
-        <!-- Convertidores para roles -->
-        <local:RolToColorConverter x:Key="RolToColorConverter"/>
-        <local:ActiveToColorConverter x:Key="ActiveToColorConverter"/>
-    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,7 +11,8 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Style="{StaticResource ModernBorder}" CornerRadius="8,8,0,0" Margin="0,0,0,1">
+        <Border Grid.Row="0" Style="{StaticResource ModernBorder}" 
+                CornerRadius="8,8,0,0" Margin="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -41,211 +35,181 @@
                             IsEnabled="{Binding CanEdit}"
                             Margin="0,0,10,0"/>
                     <Button Content="🔧 Permisos" 
-                            Style="{StaticResource ModernButton}"
+                            Style="{StaticResource InfoButton}"
                             Command="{Binding ManagePermissionsCommand}"
-                            IsEnabled="{Binding HasSelectedUser}"
+                            IsEnabled="{Binding CanEdit}"
                             Margin="0,0,10,0"/>
                     <Button Content="🔑 Cambiar Contraseña" 
                             Style="{StaticResource WarningButton}"
                             Command="{Binding ChangePasswordCommand}"
-                            IsEnabled="{Binding HasSelectedUser}"/>
+                            IsEnabled="{Binding CanEdit}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Filtros y Búsqueda -->
-        <Border Grid.Row="1" 
-                Background="{DynamicResource BorderBrush}" 
-                Padding="20,15">
-            <Grid>
+        <!-- Filtros -->
+        <Border Grid.Row="1" Style="{StaticResource ModernBorder}" 
+                CornerRadius="0" Margin="0,0,0,1">
+            <Grid Margin="15">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="250"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0">
-                    <Label Content="🔍 Buscar:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <TextBox Style="{StaticResource ModernTextBox}"
-                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Buscar por nombre de usuario"/>
-                </StackPanel>
+                <TextBox Grid.Column="0" 
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         Height="35"
+                         Tag="Buscar por usuario, nombre, email o rol..."/>
 
-                <StackPanel Grid.Column="1" Margin="15,0,0,0">
-                    <Label Content="Rol:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <ComboBox Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding RolesFilter}"
-                              SelectedValue="{Binding SelectedRolFilter}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Value"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Margin="15,0,0,0">
-                    <Label Content="Estado:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <ComboBox Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding EstadoFilter}"
-                              SelectedValue="{Binding SelectedEstadoFilter}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Value"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Bottom">
-                    <Button Content="🗑️ Limpiar" 
-                            Style="{StaticResource ModernButton}"
-                            Command="{Binding ClearFiltersCommand}"
-                            Margin="0,0,10,0"/>
-                    <Button Content="📊 Auditoría" 
-                            Style="{StaticResource ModernButton}"
-                            Command="{Binding ShowAuditCommand}"/>
-                </StackPanel>
+                <Button Grid.Column="1" 
+                        Content="🗑️ Limpiar"
+                        Style="{StaticResource WarningButton}"
+                        Command="{Binding ClearFiltersCommand}"
+                        Height="35" Width="80" Margin="10,0,0,0"/>
             </Grid>
         </Border>
 
-        <!-- DataGrid -->
-        <Border Grid.Row="2" Style="{StaticResource ModernBorder}" CornerRadius="0,0,8,8" Margin="0,0,0,0">
-            <DataGrid x:Name="dgUsuarios"
-                      Style="{StaticResource DataGridStyle}"
-                      ItemsSource="{Binding UsuariosFiltered}"
-                      SelectedItem="{Binding SelectedUser}"
-                      ColumnHeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+        <!-- Lista de Usuarios -->
+        <DataGrid Grid.Row="2" 
+                  ItemsSource="{Binding UsuariosFiltered}"
+                  SelectedItem="{Binding SelectedUsuario}"
+                  Style="{StaticResource DataGridStyle}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True">
 
-                <DataGrid.Columns>
-                    <!-- Nombre de Usuario -->
-                    <DataGridTextColumn Header="Usuario" 
-                                        Binding="{Binding NombreUsuario}" 
-                                        Width="150"/>
-
-                    <!-- Rol con color -->
-                    <DataGridTemplateColumn Header="Rol" Width="120">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border Background="{Binding Rol, Converter={StaticResource RolToColorConverter}}" 
-                                        CornerRadius="12" Padding="8,4">
-                                    <TextBlock Text="{Binding Rol}" 
-                                               Foreground="White" 
-                                               FontSize="10" 
-                                               FontWeight="Bold"
-                                               HorizontalAlignment="Center"/>
+            <DataGrid.Columns>
+                <!-- Usuario -->
+                <DataGridTemplateColumn Header="Usuario" Width="200">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="{DynamicResource AccentBrush}" 
+                                        CornerRadius="15" 
+                                        Width="30" Height="30" 
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="👤" FontSize="14" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center" 
+                                               Foreground="White"/>
                                 </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Estado -->
-                    <DataGridTemplateColumn Header="Estado" Width="80">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border Background="{Binding Activo, Converter={StaticResource ActiveToColorConverter}}" 
-                                        CornerRadius="4" Padding="6,2">
-                                    <TextBlock Text="{Binding EstadoTexto}" 
-                                               Foreground="White" 
-                                               FontSize="10"
+                                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding NombreUsuario}" 
                                                FontWeight="Bold"
-                                               HorizontalAlignment="Center"/>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Fecha de Creación -->
-                    <DataGridTextColumn Header="Fecha Creación" 
-                                        Binding="{Binding FechaCreacion, StringFormat='{}{0:dd/MM/yyyy}'}" 
-                                        Width="120"/>
-
-                    <!-- Último Acceso -->
-                    <DataGridTextColumn Header="Último Acceso" 
-                                        Binding="{Binding UltimoAcceso, StringFormat='{}{0:dd/MM/yyyy HH:mm}'}" 
-                                        Width="140"/>
-
-                    <!-- Total de Acciones -->
-                    <DataGridTextColumn Header="Acciones" 
-                                        Binding="{Binding TotalAcciones}" 
-                                        Width="80"/>
-
-                    <!-- Permisos -->
-                    <DataGridTemplateColumn Header="Permisos" Width="200">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🔧" ToolTip="Gestión" 
-                                               Visibility="{Binding TienePermisoGestion}" 
-                                               Margin="2"/>
-                                    <TextBlock Text="👥" ToolTip="Abonados" 
-                                               Visibility="{Binding TienePermisoAbonados}" 
-                                               Margin="2"/>
-                                    <TextBlock Text="📊" ToolTip="Reportes" 
-                                               Visibility="{Binding TienePermisoReportes}" 
-                                               Margin="2"/>
-                                    <TextBlock Text="⚙️" ToolTip="Configuración" 
-                                               Visibility="{Binding TienePermisoConfiguracion}" 
-                                               Margin="2"/>
-                                    <TextBlock Text="🔐" ToolTip="Usuarios" 
-                                               Visibility="{Binding TienePermisoUsuarios}" 
-                                               Margin="2"/>
+                                               Foreground="{DynamicResource ForegroundBrush}"/>
+                                    <TextBlock Text="{Binding NombreCompleto}" 
+                                               FontSize="11" 
+                                               Foreground="{DynamicResource MutedBrush}"/>
                                 </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
-                    <!-- Acciones -->
-                    <DataGridTemplateColumn Header="Acciones" Width="200">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Button Content="✏️" 
-                                            Style="{StaticResource ModernButton}"
-                                            Command="{Binding DataContext.EditUserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            ToolTip="Editar usuario"
-                                            Margin="2" Padding="6,4"/>
+                <!-- Email -->
+                <DataGridTextColumn Header="Email" 
+                                    Binding="{Binding Email}"
+                                    Width="180"/>
 
-                                    <Button Content="{Binding ToggleButtonText}" 
-                                            Style="{Binding ToggleButtonStyle}"
-                                            Command="{Binding DataContext.ToggleUserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            ToolTip="{Binding ToggleButtonTooltip}"
-                                            Margin="2" Padding="6,4"/>
+                <!-- Rol -->
+                <DataGridTemplateColumn Header="Rol" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding Rol, Converter={StaticResource RolToColorConverter}}" 
+                                    CornerRadius="12" Padding="8,4">
+                                <TextBlock Text="{Binding Rol}" 
+                                           Foreground="White" 
+                                           FontSize="11" FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
-                                    <Button Content="🗑️" 
-                                            Style="{StaticResource DangerButton}"
-                                            Command="{Binding DataContext.DeleteUserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            Visibility="{Binding CanDelete}"
-                                            ToolTip="Eliminar usuario"
-                                            Margin="2" Padding="6,4"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
+                <!-- Estado -->
+                <DataGridTemplateColumn Header="Estado" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding Activo, Converter={StaticResource BoolToColorConverter}}" 
+                                    CornerRadius="12" Padding="8,4">
+                                <TextBlock Text="{Binding EstadoTexto}" 
+                                           Foreground="White" 
+                                           FontSize="11" FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding Activo}" Value="False">
-                                <Setter Property="Opacity" Value="0.6"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.RowStyle>
-            </DataGrid>
-        </Border>
+                <!-- Último Acceso -->
+                <DataGridTextColumn Header="Último Acceso" 
+                                    Binding="{Binding UltimoAccesoTexto}"
+                                    Width="120"/>
+
+                <!-- Total Acciones -->
+                <DataGridTextColumn Header="Acciones" 
+                                    Binding="{Binding TotalAcciones}"
+                                    Width="80"/>
+
+                <!-- Permisos -->
+                <DataGridTextColumn Header="Permisos" 
+                                    Binding="{Binding PermisosSummary}"
+                                    Width="150"/>
+
+                <!-- Acciones -->
+                <DataGridTemplateColumn Header="Acciones" Width="250">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏️" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.EditUserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Editar"
+                                        Margin="2"/>
+
+                                <Button Content="{Binding ToggleButtonText}" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{Binding ToggleButtonTooltip}"
+                                        Margin="2"/>
+
+                                <Button Content="🔧" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ManagePermissionsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Permisos"
+                                        Margin="2"/>
+
+                                <Button Content="🔑" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ChangePasswordCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Cambiar Contraseña"
+                                        Margin="2"/>
+
+                                <Button Content="📋" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ViewHistoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Ver Historial"
+                                        Margin="2"/>
+
+                                <Button Content="🗑️" 
+                                        Style="{StaticResource DangerIconButton}"
+                                        Command="{Binding DataContext.DeleteUserCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Eliminar"
+                                        Margin="2"
+                                        Visibility="{Binding CanDelete, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </UserControl>

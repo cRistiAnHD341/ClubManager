@@ -1,0 +1,273 @@
+﻿<UserControl x:Class="ClubManager.Views.ConfiguracionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:ClubManager.Converters"
+             Background="{DynamicResource BackgroundBrush}">
+
+    <UserControl.Resources>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30">
+
+            <!-- Título -->
+            <TextBlock Text="⚙️ Configuración del Club" 
+                       Style="{StaticResource TitleTextBlock}"
+                       Margin="0,0,0,30"/>
+
+            <!-- Información del Club -->
+            <GroupBox Header="🏢 Información del Club" Margin="0,0,0,20">
+                <Grid Margin="15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Nombre del Club -->
+                    <Label Grid.Row="0" Grid.Column="0" 
+                           Content="Nombre del Club:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="0" Grid.Column="2" 
+                             Text="{Binding NombreClub}" 
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,10"/>
+
+                    <!-- Temporada Actual -->
+                    <Label Grid.Row="1" Grid.Column="0" 
+                           Content="Temporada Actual:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="1" Grid.Column="2" 
+                             Text="{Binding TemporadaActual}" 
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,10"/>
+
+                    <!-- Dirección -->
+                    <Label Grid.Row="2" Grid.Column="0" 
+                           Content="Dirección:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="2" Grid.Column="2" 
+                             Text="{Binding DireccionClub}" 
+                             Style="{StaticResource ModernTextBox}"
+                             Height="60" 
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             Margin="0,0,0,10"/>
+
+                    <!-- Teléfono -->
+                    <Label Grid.Row="3" Grid.Column="0" 
+                           Content="Teléfono:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="3" Grid.Column="2" 
+                             Text="{Binding TelefonoClub}" 
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,10"/>
+
+                    <!-- Email -->
+                    <Label Grid.Row="4" Grid.Column="0" 
+                           Content="Email:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="4" Grid.Column="2" 
+                             Text="{Binding EmailClub}" 
+                             Style="{StaticResource ModernTextBox}"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- Configuración Web y Medios -->
+            <GroupBox Header="🌐 Web y Medios" Margin="0,0,0,20">
+                <Grid Margin="15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Sitio Web -->
+                    <Label Grid.Row="0" Grid.Column="0" 
+                           Content="Sitio Web:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBox Grid.Row="0" Grid.Column="2" 
+                             Text="{Binding SitioWebClub}" 
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,10"/>
+
+                    <!-- Logo del Club -->
+                    <Label Grid.Row="1" Grid.Column="0" 
+                           Content="Logo del Club:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,10">
+                        <Button Content="📁 Seleccionar Logo" 
+                                Style="{StaticResource ModernButton}"
+                                Command="{Binding SelectLogoCommand}"
+                                Width="150" Margin="0,0,10,0"/>
+                        <Button Content="🗑️ Quitar Logo" 
+                                Style="{StaticResource DangerButton}"
+                                Command="{Binding RemoveLogoCommand}"
+                                Width="120"
+                                Visibility="{Binding LogoClub}"/>
+                    </StackPanel>
+
+                    <!-- Escudo del Club -->
+                    <Label Grid.Row="2" Grid.Column="0" 
+                           Content="Escudo del Club:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal">
+                        <Button Content="🛡️ Seleccionar Escudo" 
+                                Style="{StaticResource ModernButton}"
+                                Command="{Binding SelectEscudoCommand}"
+                                Width="150" Margin="0,0,10,0"/>
+                        <Button Content="🗑️ Quitar Escudo" 
+                                Style="{StaticResource DangerButton}"
+                                Command="{Binding RemoveEscudoCommand}"
+                                Width="120"
+                                Visibility="{Binding RutaEscudo}"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Configuración del Sistema -->
+            <GroupBox Header="⚙️ Configuración del Sistema" Margin="0,0,0,20">
+                <StackPanel Margin="15">
+
+                    <!-- Backup Automático -->
+                    <CheckBox Content="🔄 Backup automático diario" 
+                              Style="{StaticResource ModernCheckBox}"
+                              IsChecked="{Binding AutoBackup}"
+                              Margin="0,0,0,10"/>
+
+                    <!-- Confirmar Eliminaciones -->
+                    <CheckBox Content="⚠️ Confirmar eliminaciones" 
+                              Style="{StaticResource ModernCheckBox}"
+                              IsChecked="{Binding ConfirmarEliminaciones}"
+                              Margin="0,0,0,10"/>
+
+                    <!-- Mostrar Ayudas -->
+                    <CheckBox Content="💡 Mostrar ayudas y consejos" 
+                              Style="{StaticResource ModernCheckBox}"
+                              IsChecked="{Binding MostrarAyudas}"
+                              Margin="0,0,0,10"/>
+
+                    <!-- Numeración Automática -->
+                    <CheckBox Content="🔢 Numeración automática de socios" 
+                              Style="{StaticResource ModernCheckBox}"
+                              IsChecked="{Binding NumeracionAutomatica}"
+                              Margin="0,0,0,15"/>
+
+                    <!-- Formato de Número de Socio -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Label Content="Formato de número de socio:" 
+                               Style="{StaticResource ModernLabel}"
+                               Width="200"/>
+                        <ComboBox SelectedValue="{Binding FormatoNumeroSocioSeleccionado}"
+                                  DisplayMemberPath="Display"
+                                  SelectedValuePath="Value"
+                                  ItemsSource="{Binding FormatosNumeroSocio}"
+                                  Style="{StaticResource ModernComboBox}"
+                                  Width="200"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Información de Licencia -->
+            <GroupBox Header="🔐 Información de Licencia" Margin="0,0,0,20">
+                <Grid Margin="15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Estado de la Licencia -->
+                    <Label Grid.Row="0" Grid.Column="0" 
+                           Content="Estado:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" 
+                               Text="{Binding LicenseState}" 
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"
+                               Margin="10,0,0,0"/>
+
+                    <!-- Club -->
+                    <Label Grid.Row="1" Grid.Column="0" 
+                           Content="Club:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" 
+                               Text="{Binding LicenseClubName}" 
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"/>
+
+                    <!-- Expiración -->
+                    <Label Grid.Row="2" Grid.Column="0" 
+                           Content="Expira:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" 
+                               Text="{Binding LicenseExpiration}" 
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"/>
+
+                    <!-- Botones de Licencia -->
+                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" 
+                                Orientation="Horizontal" 
+                                HorizontalAlignment="Right"
+                                Margin="0,15,0,0">
+                        <Button Content="ℹ️ Información" 
+                                Style="{StaticResource InfoButton}"
+                                Command="{Binding ShowLicenseInfoCommand}"
+                                Width="120" Margin="0,0,10,0"/>
+                        <Button Content="🔑 Cambiar Licencia" 
+                                Style="{StaticResource AccentButton}"
+                                Command="{Binding ChangeLicenseCommand}"
+                                Width="150"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Botones de Acción -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Center" 
+                        Margin="0,30,0,0">
+
+                <Button Content="💾 Guardar Configuración" 
+                        Style="{StaticResource SuccessButton}"
+                        Command="{Binding GuardarConfiguracionCommand}"
+                        Width="180" Height="40"
+                        Margin="0,0,15,0"/>
+
+                <Button Content="📥 Importar Datos CSV" 
+                        Style="{StaticResource InfoButton}"
+                        Command="{Binding ImportarDatosCommand}"
+                        Width="180" Height="40"
+                        Margin="0,0,15,0"/>
+
+                <Button Content="🔄 Restaurar Predeterminados" 
+                        Style="{StaticResource WarningButton}"
+                        Command="{Binding RestaurarConfiguracionCommand}"
+                        Width="200" Height="40"
+                        Margin="0,0,15,0"/>
+
+                <Button Content="📋 Exportar Configuración" 
+                        Style="{StaticResource ModernButton}"
+                        Command="{Binding ExportarConfiguracionCommand}"
+                        Width="180" Height="40"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

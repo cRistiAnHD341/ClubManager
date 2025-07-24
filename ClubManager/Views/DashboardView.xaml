@@ -3,25 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource BackgroundBrush}">
 
-    <UserControl.Resources>
-        <!-- Estilos específicos del Dashboard usando temas dinámicos -->
-        <Style x:Key="RecentItemBorder" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource SecondaryBackgroundBrush}"/>
-            <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="15,10"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-
-        <Style x:Key="SectionTitleDashboard" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Margin" Value="10,20,10,10"/>
-        </Style>
-    </UserControl.Resources>
-
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="20">
             <Grid.RowDefinitions>
@@ -31,42 +12,18 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <Border Grid.Row="0" Style="{StaticResource StatCard}" Margin="0,0,0,20">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+            <!-- Título del Dashboard -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,20">
+                <TextBlock Text="📊 Panel de Control" 
+                           FontSize="24" FontWeight="Bold" 
+                           Foreground="{DynamicResource ForegroundBrush}"/>
+                <TextBlock Text="Resumen general del estado del club" 
+                           FontSize="14" 
+                           Foreground="{DynamicResource MutedBrush}"/>
+            </StackPanel>
 
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="🏠 Dashboard" 
-                                   FontSize="24" FontWeight="Bold" 
-                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                   Margin="0,0,0,5"/>
-                        <TextBlock Text="{Binding WelcomeMessage}" 
-                                   FontSize="14" 
-                                   Foreground="{DynamicResource MutedBrush}"/>
-                        <TextBlock Text="{Binding LastUpdateText}" 
-                                   FontSize="12" 
-                                   Foreground="{DynamicResource MutedBrush}" 
-                                   Margin="0,5,0,0"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button Content="🔄 Actualizar" 
-                                Style="{StaticResource ModernButton}"
-                                Command="{Binding RefreshCommand}" 
-                                Margin="0,0,10,0"/>
-                        <Button Content="📊 Resumen" 
-                                Style="{StaticResource ModernButton}"
-                                Command="{Binding ShowSummaryCommand}"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- Estadísticas Principales -->
-            <Grid Grid.Row="1" Margin="0,0,0,20">
+            <!-- Tarjetas de Estadísticas Principales -->
+            <Grid Grid.Row="1" Margin="0,0,0,30">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -75,305 +32,236 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Total Abonados -->
-                <Border Grid.Column="0" Style="{StaticResource StatCard}">
+                <Border Grid.Column="0" Style="{StaticResource StatCard}" 
+                        Background="{DynamicResource AccentBrush}" Margin="0,0,10,0">
                     <StackPanel>
-                        <TextBlock Text="👥" Style="{StaticResource StatIcon}" 
-                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <TextBlock Text="👥" FontSize="32" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
                         <TextBlock Text="{Binding TotalAbonados}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="{DynamicResource AccentBrush}"/>
-                        <TextBlock Text="Total Abonados" Style="{StaticResource StatLabel}"/>
+                                   FontSize="28" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="Total Abonados" 
+                                   FontSize="14" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Abonados Activos -->
-                <Border Grid.Column="1" Style="{StaticResource StatCard}">
+                <Border Grid.Column="1" Style="{StaticResource StatCard}" 
+                        Background="{DynamicResource SuccessBrush}" Margin="5,0">
                     <StackPanel>
-                        <TextBlock Text="✅" Style="{StaticResource StatIcon}" 
-                                   Foreground="{DynamicResource SuccessBrush}"/>
+                        <TextBlock Text="✅" FontSize="32" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
                         <TextBlock Text="{Binding AbonadosActivos}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="{DynamicResource SuccessBrush}"/>
-                        <TextBlock Text="Activos (Pagados)" Style="{StaticResource StatLabel}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Abonados Inactivos -->
-                <Border Grid.Column="2" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="❌" Style="{StaticResource StatIcon}" 
-                                   Foreground="{DynamicResource DangerBrush}"/>
-                        <TextBlock Text="{Binding AbonadosInactivos}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="{DynamicResource DangerBrush}"/>
-                        <TextBlock Text="Inactivos (Pendientes)" Style="{StaticResource StatLabel}"/>
+                                   FontSize="28" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="Activos" 
+                                   FontSize="14" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White" Opacity="0.9"/>
+                        <TextBlock Text="{Binding PorcentajeActivos}" 
+                                   FontSize="12" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White" Opacity="0.8"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Ingresos Estimados -->
-                <Border Grid.Column="3" Style="{StaticResource StatCard}">
+                <Border Grid.Column="2" Style="{StaticResource StatCard}" 
+                        Background="{DynamicResource WarningBrush}" Margin="5,0">
                     <StackPanel>
-                        <TextBlock Text="💰" Style="{StaticResource StatIcon}" 
-                                   Foreground="{DynamicResource WarningBrush}"/>
-                        <TextBlock Text="{Binding IngresosEstimados}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="{DynamicResource WarningBrush}"/>
-                        <TextBlock Text="Ingresos Estimados" Style="{StaticResource StatLabel}"/>
+                        <TextBlock Text="💰" FontSize="32" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="{Binding IngresosEstimados, StringFormat=€{0:N0}}" 
+                                   FontSize="28" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="Ingresos Est." 
+                                   FontSize="14" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Peñas Activas -->
+                <Border Grid.Column="3" Style="{StaticResource StatCard}" 
+                        Background="{DynamicResource InfoBrush}" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="🚩" FontSize="32" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="{Binding PeñasActivas}" 
+                                   FontSize="28" FontWeight="Bold" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White"/>
+                        <TextBlock Text="Peñas" 
+                                   FontSize="14" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="White" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
             <!-- Estadísticas Secundarias -->
-            <Grid Grid.Row="2" Margin="0,0,0,20">
+            <Grid Grid.Row="2" Margin="0,0,0,30">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Abonados Impresos -->
-                <Border Grid.Column="0" Style="{StaticResource StatCard}">
+                <!-- Gráfico de Estadísticas Mensuales -->
+                <Border Grid.Column="0" Style="{StaticResource ModernBorder}" Margin="0,0,10,0">
                     <StackPanel>
-                        <TextBlock Text="🖨️" Style="{StaticResource StatIcon}" 
-                                   Foreground="#FF9C27B0"/>
-                        <TextBlock Text="{Binding AbonadosImpresos}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="#FF9C27B0"/>
-                        <TextBlock Text="Abonados Impresos" Style="{StaticResource StatLabel}"/>
-                    </StackPanel>
-                </Border>
+                        <TextBlock Text="📈 Estadísticas Mensuales" 
+                                   FontSize="16" FontWeight="Bold" 
+                                   Foreground="{DynamicResource ForegroundBrush}"
+                                   Margin="0,0,0,15"/>
 
-                <!-- Peñas Activas -->
-                <Border Grid.Column="1" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="🎪" Style="{StaticResource StatIcon}" 
-                                   Foreground="{DynamicResource InfoBrush}"/>
-                        <TextBlock Text="{Binding PeñasActivas}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="{DynamicResource InfoBrush}"/>
-                        <TextBlock Text="Peñas con Abonados" Style="{StaticResource StatLabel}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Tipos de Abono -->
-                <Border Grid.Column="2" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="🎫" Style="{StaticResource StatIcon}" 
-                                   Foreground="#FF8BC34A"/>
-                        <TextBlock Text="{Binding TiposAbonoCount}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="#FF8BC34A"/>
-                        <TextBlock Text="Tipos de Abono" Style="{StaticResource StatLabel}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Porcentaje de Pago -->
-                <Border Grid.Column="3" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="📊" Style="{StaticResource StatIcon}" 
-                                   Foreground="#FFFF5722"/>
-                        <TextBlock Text="{Binding PorcentajePago}" 
-                                   Style="{StaticResource StatNumber}" 
-                                   Foreground="#FFFF5722"/>
-                        <TextBlock Text="% de Pago" Style="{StaticResource StatLabel}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Sección de Actividad Reciente y Distribución -->
-            <Grid Grid.Row="3">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="3*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Actividad Reciente -->
-                <Border Grid.Column="0" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="📜 Actividad Reciente" 
-                                   Style="{StaticResource SectionTitleDashboard}"/>
-
-                        <ScrollViewer Height="300" VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding ActividadReciente}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource RecentItemBorder}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <TextBlock Grid.Column="0" 
-                                                           Text="{Binding Icono}" 
-                                                           FontSize="16" 
-                                                           VerticalAlignment="Center" 
-                                                           Margin="0,0,10,0"/>
-
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="{Binding Accion}" 
-                                                               Foreground="{DynamicResource ForegroundBrush}" 
-                                                               FontWeight="SemiBold" 
-                                                               TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Detalle}" 
-                                                               Foreground="{DynamicResource MutedBrush}" 
-                                                               FontSize="12" 
-                                                               TextWrapping="Wrap"/>
-                                                </StackPanel>
-
-                                                <TextBlock Grid.Column="2" 
-                                                           Text="{Binding TiempoTranscurrido}" 
-                                                           Foreground="{DynamicResource MutedBrush}" 
-                                                           FontSize="11" 
-                                                           VerticalAlignment="Top"/>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-
-                        <Button Content="📋 Ver Historial Completo" 
-                                Style="{StaticResource ModernButton}"
-                                Command="{Binding ShowHistorialCommand}"
-                                Margin="0,10,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Distribución y Gráficos -->
-                <Border Grid.Column="2" Style="{StaticResource StatCard}">
-                    <StackPanel>
-                        <TextBlock Text="📊 Distribución de Abonados" 
-                                   Style="{StaticResource SectionTitleDashboard}"/>
-
-                        <!-- Distribución por Estado -->
-                        <TextBlock Text="Por Estado de Pago:" 
-                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                   FontWeight="SemiBold" 
-                                   Margin="0,10,0,10"/>
-
-                        <Grid Margin="0,0,0,20">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <!-- Barra Activos -->
-                            <Grid Grid.Row="0" Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="80"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="60"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0" Text="Activos" 
-                                           Foreground="{DynamicResource SuccessBrush}" 
-                                           VerticalAlignment="Center"/>
-                                <Border Grid.Column="1" 
-                                        Background="{DynamicResource BorderBrush}" 
-                                        Height="20" CornerRadius="10" Margin="10,0">
-                                    <Border Background="{DynamicResource SuccessBrush}" 
-                                            HorizontalAlignment="Left"
-                                            Width="{Binding BarraActivos}"
-                                            CornerRadius="10"/>
-                                </Border>
-                                <TextBlock Grid.Column="2" Text="{Binding AbonadosActivos}" 
-                                           Foreground="{DynamicResource ForegroundBrush}" 
-                                           VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                            </Grid>
-
-                            <!-- Barra Inactivos -->
-                            <Grid Grid.Row="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="80"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="60"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0" Text="Inactivos" 
-                                           Foreground="{DynamicResource DangerBrush}" 
-                                           VerticalAlignment="Center"/>
-                                <Border Grid.Column="1" 
-                                        Background="{DynamicResource BorderBrush}" 
-                                        Height="20" CornerRadius="10" Margin="10,0">
-                                    <Border Background="{DynamicResource DangerBrush}" 
-                                            HorizontalAlignment="Left"
-                                            Width="{Binding BarraInactivos}"
-                                            CornerRadius="10"/>
-                                </Border>
-                                <TextBlock Grid.Column="2" Text="{Binding AbonadosInactivos}" 
-                                           Foreground="{DynamicResource ForegroundBrush}" 
-                                           VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                            </Grid>
-                        </Grid>
-
-                        <!-- Distribución por Peñas -->
-                        <TextBlock Text="Top 5 Peñas:" 
-                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                   FontWeight="SemiBold" 
-                                   Margin="0,20,0,10"/>
-
-                        <ItemsControl ItemsSource="{Binding TopPeñas}">
+                        <ItemsControl ItemsSource="{Binding EstadisticasMensuales}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="0,0,0,8">
+                                    <Grid Margin="0,2">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="2*"/>
-                                            <ColumnDefinition Width="3*"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0" Text="{Binding Nombre}" 
-                                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                                   VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <Border Grid.Column="1" 
-                                                Background="{DynamicResource BorderBrush}" 
-                                                Height="16" CornerRadius="8" Margin="10,0">
-                                            <Border Background="{Binding Color}" 
-                                                    HorizontalAlignment="Left"
-                                                    Width="{Binding BarWidth}"
-                                                    CornerRadius="8"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="2" Text="{Binding Count}" 
-                                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                                   VerticalAlignment="Center" 
-                                                   HorizontalAlignment="Right" Margin="10,0,0,0"/>
+                                        <TextBlock Grid.Column="0" Text="{Binding Mes}" 
+                                                   FontSize="12" 
+                                                   Foreground="{DynamicResource MutedBrush}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Abonados}" 
+                                                   FontSize="12" FontWeight="Bold"
+                                                   Foreground="{DynamicResource ForegroundBrush}"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-                        <!-- Acciones Rápidas -->
-                        <TextBlock Text="⚡ Acciones Rápidas:" 
-                                   Foreground="{DynamicResource ForegroundBrush}" 
-                                   FontWeight="SemiBold" 
-                                   Margin="0,30,0,10"/>
+                <!-- Estadísticas por Peñas -->
+                <Border Grid.Column="1" Style="{StaticResource ModernBorder}" Margin="5,0">
+                    <StackPanel>
+                        <TextBlock Text="🚩 Distribución por Peñas" 
+                                   FontSize="16" FontWeight="Bold" 
+                                   Foreground="{DynamicResource ForegroundBrush}"
+                                   Margin="0,0,0,15"/>
 
-                        <UniformGrid Columns="2" Margin="0,0,0,10">
-                            <Button Content="➕ Nuevo Abonado" 
-                                    Style="{StaticResource ModernButton}"
-                                    Command="{Binding NewAbonadoCommand}"
-                                    Margin="0,0,5,5"/>
-                            <Button Content="📊 Estadísticas" 
-                                    Style="{StaticResource ModernButton}"
-                                    Command="{Binding ShowStatsCommand}"
-                                    Margin="5,0,0,5"/>
-                            <Button Content="🖨️ Pendientes" 
-                                    Style="{StaticResource ModernButton}"
-                                    Command="{Binding ShowPendientesCommand}"
-                                    Margin="0,5,5,0"/>
-                            <Button Content="📤 Exportar" 
-                                    Style="{StaticResource ModernButton}"
-                                    Command="{Binding ExportCommand}"
-                                    Margin="5,5,0,0"/>
-                        </UniformGrid>
+                        <ItemsControl ItemsSource="{Binding EstadisticasPeñas}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,5">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Nombre}" 
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource ForegroundBrush}"/>
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="{Binding Activos, StringFormat={}{0} activos}"
+                                                       FontSize="11" 
+                                                       Foreground="{DynamicResource SuccessBrush}"/>
+                                        </Grid>
+
+                                        <ProgressBar Grid.Row="1" 
+                                                     Value="{Binding Porcentaje, Mode=OneWay}" 
+                                                     Maximum="100" 
+                                                     Height="8" 
+                                                     Margin="0,3,0,0"
+                                                     Background="{DynamicResource BorderBrush}"
+                                                     Foreground="{DynamicResource AccentBrush}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Actividad Reciente -->
+                <Border Grid.Column="2" Style="{StaticResource ModernBorder}" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="⏰ Actividad Reciente" 
+                                   FontSize="16" FontWeight="Bold" 
+                                   Foreground="{DynamicResource ForegroundBrush}"
+                                   Margin="0,0,0,15"/>
+
+                        <ItemsControl ItemsSource="{Binding ActividadReciente}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SecondaryBackgroundBrush}" 
+                                            CornerRadius="5" Padding="8" Margin="0,2">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Text="{Binding Accion}" 
+                                                       FontSize="11" 
+                                                       Foreground="{DynamicResource ForegroundBrush}"
+                                                       TextWrapping="Wrap"/>
+
+                                            <Grid Grid.Row="1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Usuario}" 
+                                                           FontSize="10" 
+                                                           Foreground="{DynamicResource AccentBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding FechaTexto}" 
+                                                           FontSize="10" 
+                                                           Foreground="{DynamicResource MutedBrush}"/>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- Accesos Rápidos -->
+            <Border Grid.Row="3" Style="{StaticResource ModernBorder}">
+                <StackPanel>
+                    <TextBlock Text="🚀 Accesos Rápidos" 
+                               FontSize="18" FontWeight="Bold" 
+                               Foreground="{DynamicResource ForegroundBrush}"
+                               Margin="0,0,0,20"/>
+
+                    <WrapPanel HorizontalAlignment="Center">
+                        <Button Content="➕ Nuevo Abonado" 
+                                Style="{StaticResource ActionButton}" 
+                                Margin="10"/>
+                        <Button Content="🎫 Tipos de Abono" 
+                                Style="{StaticResource ActionButton}" 
+                                Margin="10"/>
+                        <Button Content="🖨️ Imprimir Tarjetas" 
+                                Style="{StaticResource ActionButton}" 
+                                Margin="10"/>
+                        <Button Content="📊 Exportar Datos" 
+                                Style="{StaticResource ActionButton}" 
+                                Margin="10"/>
+                        <Button Content="🎨 Diseñar Tarjetas" 
+                                Style="{StaticResource ActionButton}" 
+                                Margin="10"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
         </Grid>
     </ScrollViewer>
 </UserControl>

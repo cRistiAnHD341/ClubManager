@@ -11,7 +11,7 @@ using ClubManager.Commands;
 
 namespace ClubManager.ViewModels
 {
-    public class LicenseViewModel : INotifyPropertyChanged
+    public class LicenseViewModel : BaseViewModel
     {
         private readonly ILicenseService _licenseService;
         private string _licenseKey = "";
@@ -42,8 +42,7 @@ namespace ClubManager.ViewModels
             get => _licenseKey;
             set
             {
-                _licenseKey = value;
-                OnPropertyChanged();
+                SetProperty(ref _licenseKey, value);
                 ValidateLicenseKey();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -52,25 +51,25 @@ namespace ClubManager.ViewModels
         public string StatusMessage
         {
             get => _statusMessage;
-            set { _statusMessage = value; OnPropertyChanged(); }
+            set => SetProperty(ref _statusMessage, value);
         }
 
         public string StatusColor
         {
             get => _statusColor;
-            set { _statusColor = value; OnPropertyChanged(); }
+            set => SetProperty(ref _statusColor, value);
         }
 
         public string LicenseDetails
         {
             get => _licenseDetails;
-            set { _licenseDetails = value; OnPropertyChanged(); }
+            set => SetProperty(ref _licenseDetails, value);
         }
 
         public Visibility ShowDetails
         {
             get => _showDetails;
-            set { _showDetails = value; OnPropertyChanged(); }
+            set => SetProperty(ref _showDetails, value);
         }
 
         #endregion
@@ -81,38 +80,108 @@ namespace ClubManager.ViewModels
         public ICommand PasteFromClipboardCommand { get; }
         public ICommand ActivateLicenseCommand { get; }
 
-        #endregion
-
-        #region Methods
-
-        private void UpdateStatusFromCurrentLicense()
+        private bool CanActivateLicense()
         {
-            var currentLicense = _licenseService.GetCurrentLicenseInfo();
+            return !string.IsNullOrWhiteSpace(LicenseKey) && LicenseKey.Length >= 10;
+        }
 
-            if (currentLicense.IsValid)
+        private void LoadFromFile()
+        {
+            try
             {
-                if (currentLicense.IsExpired)
+                OpenFileDialog openDialog = new OpenFileDialog
                 {
-                    StatusMessage = "⚠️ Licencia expirada - Modo solo lectura";
-                    StatusColor = "#FFFF9800"; // Amarillo/Naranja
-                    LicenseDetails = $"Club: {currentLicense.ClubName}\nExpiró: {currentLicense.ExpirationDate:dd/MM/yyyy HH:mm}";
+                    Filter = "Archivos de Licencia (*.lic)|*.lic|Archivos de Texto (*.txt)|*.txt|Todos los archivos (*.*)|*.*",
+                    Title = "Cargar archivo de licencia"
+                };
+
+                if (openDialog.ShowDialog() == true)
+                {
+                    var content = File.ReadAllText(openDialog.FileName).Trim();
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        LicenseKey = content;
+                        StatusMessage = "📄 Licencia cargada desde archivo";
+                    }
+                    else
+                    {
+                        StatusMessage = "❌ El archivo está vacío";
+                        StatusColor = "#FFF44336";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"❌ Error al cargar archivo: {ex.Message}";
+                StatusColor = "#FFF44336";
+            }
+        }
+
+        private void PasteFromClipboard()
+        {
+            try
+            {
+                if (Clipboard.ContainsText())
+                {
+                    var clipboardText = Clipboard.GetText().Trim();
+                    if (!string.IsNullOrEmpty(clipboardText))
+                    {
+                        LicenseKey = clipboardText;
+                        StatusMessage = "📋 Licencia pegada desde portapapeles";
+                    }
+                    else
+                    {
+                        StatusMessage = "❌ El portapapeles está vacío";
+                        StatusColor = "#FFF44336";
+                    }
                 }
                 else
                 {
-                    StatusMessage = "✅ Licencia válida y activa";
-                    StatusColor = "#FF4CAF50"; // Verde
-                    LicenseDetails = $"Club: {currentLicense.ClubName}\nExpira: {currentLicense.ExpirationDate:dd/MM/yyyy HH:mm}";
+                    StatusMessage = "❌ No hay texto en el portapapeles";
+                    StatusColor = "#FFF44336";
                 }
-                ShowDetails = Visibility.Visible;
             }
-            else
+            catch (Exception ex)
             {
-                StatusMessage = "❌ Sin licencia válida";
-                StatusColor = "#FFF44336"; // Rojo
+                StatusMessage = $"❌ Error al acceder al portapapeles: {ex.Message}";
+                StatusColor = "#FFF44336";
+            }
+        }
+
+        private void ActivateLicense()
+        {
+            try
+            {
+                bool isValid = _licenseService.ActivateLicense(LicenseKey);
+
+                if (isValid)
+                {
+                    UpdateStatusFromCurrentLicense();
+                    LicenseActivated?.Invoke(this, EventArgs.Empty);
+
+                    MessageBox.Show("¡Licencia activada correctamente!", "Éxito",
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    StatusMessage = "❌ Licencia inválida";
+                    StatusColor = "#FFF44336";
+                    LicenseDetails = "";
+                    ShowDetails = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"❌ Error al activar licencia: {ex.Message}";
+                StatusColor = "#FFF44336";
                 LicenseDetails = "";
                 ShowDetails = Visibility.Collapsed;
             }
         }
+
+        #endregion
+
+        #region Methods
 
         private void ValidateLicenseKey()
         {
@@ -120,20 +189,33 @@ namespace ClubManager.ViewModels
             {
                 StatusMessage = "Introduce una clave de licencia";
                 StatusColor = "#FFCCCCCC";
-                LicenseDetails = "";
                 ShowDetails = Visibility.Collapsed;
-                return;
             }
+            else if (LicenseKey.Length < 10)
+            {
+                StatusMessage = "⚠️ La licencia debe tener al menos 10 caracteres";
+                StatusColor = "#FFFF9800";
+                ShowDetails = Visibility.Collapsed;
+            }
+            else
+            {
+                StatusMessage = "✅ Formato válido - Haz clic en Activar";
+                StatusColor = "#FF4CAF50";
+                ShowDetails = Visibility.Collapsed;
+            }
+        }
 
-            var licenseInfo = _licenseService.ValidateLicense(LicenseKey);
+        private void UpdateStatusFromCurrentLicense()
+        {
+            var licenseInfo = _licenseService.GetCurrentLicenseInfo();
 
             if (licenseInfo.IsValid)
             {
                 if (licenseInfo.IsExpired)
                 {
-                    StatusMessage = "⚠️ Licencia válida pero expirada";
-                    StatusColor = "#FFFF9800"; // Amarillo/Naranja
-                    LicenseDetails = $"Club: {licenseInfo.ClubName}\nExpiró: {licenseInfo.ExpirationDate:dd/MM/yyyy HH:mm}\n\nSe activará en modo solo lectura.";
+                    StatusMessage = "⏰ Licencia expirada";
+                    StatusColor = "#FFF44336"; // Rojo
+                    LicenseDetails = $"Club: {licenseInfo.ClubName}\nExpiró: {licenseInfo.ExpirationDate:dd/MM/yyyy HH:mm}";
                 }
                 else
                 {
@@ -166,102 +248,6 @@ namespace ClubManager.ViewModels
                 return $"{(int)remaining.TotalHours} hora(s)";
             else
                 return "Menos de 1 hora";
-        }
-
-        private void LoadFromFile()
-        {
-            try
-            {
-                OpenFileDialog openDialog = new OpenFileDialog
-                {
-                    Filter = "Archivos de Licencia (*.lic)|*.lic|Archivos de Texto (*.txt)|*.txt|Todos los archivos (*.*)|*.*",
-                    Title = "Seleccionar archivo de licencia"
-                };
-
-                if (openDialog.ShowDialog() == true)
-                {
-                    string fileContent = File.ReadAllText(openDialog.FileName);
-                    LicenseKey = fileContent.Trim();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al cargar el archivo:\n{ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void PasteFromClipboard()
-        {
-            try
-            {
-                if (Clipboard.ContainsText())
-                {
-                    LicenseKey = Clipboard.GetText().Trim();
-                }
-                else
-                {
-                    MessageBox.Show("No hay texto en el portapapeles", "Información",
-                                   MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al acceder al portapapeles:\n{ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void ActivateLicense()
-        {
-            try
-            {
-                bool success = _licenseService.SetLicenseKey(LicenseKey);
-
-                if (success)
-                {
-                    var licenseInfo = _licenseService.GetCurrentLicenseInfo();
-
-                    string message = licenseInfo.IsExpired
-                        ? "Licencia activada en modo solo lectura.\n\nLa licencia ha expirado, pero puedes consultar los datos existentes."
-                        : "¡Licencia activada correctamente!\n\nYa puedes usar todas las funciones del programa.";
-
-                    MessageBox.Show(message, "Licencia Activada",
-                                   MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    LicenseActivated?.Invoke(this, EventArgs.Empty);
-                }
-                else
-                {
-                    MessageBox.Show("No se pudo activar la licencia. Verifica que la clave sea correcta.",
-                                   "Error de Activación", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al activar la licencia:\n{ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private bool CanActivateLicense()
-        {
-            if (string.IsNullOrWhiteSpace(LicenseKey))
-                return false;
-
-            var licenseInfo = _licenseService.ValidateLicense(LicenseKey);
-            return licenseInfo.IsValid;
-        }
-
-        #endregion
-
-        #region INotifyPropertyChanged
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         #endregion

@@ -1,77 +1,77 @@
-﻿using ClubManager.Commands;
+﻿using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using ClubManager.Commands;
 using ClubManager.Data;
 using ClubManager.Models;
 using ClubManager.Services;
 using ClubManager.Views;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace ClubManager.ViewModels
 {
-    public class AbonadosViewModel : INotifyPropertyChanged
+    public class AbonadosViewModel : BaseViewModel
     {
         private readonly ClubDbContext _dbContext;
         private readonly ILicenseService _licenseService;
 
-        private ObservableCollection<Abonado> _abonados;
-        private ObservableCollection<Abonado> _abonadosFiltered;
-        private Abonado? _selectedAbonado;
+        private ObservableCollection<AbonadoSelectableViewModel> _abonados;
+        private ObservableCollection<AbonadoSelectableViewModel> _abonadosFiltered;
+        private AbonadoSelectableViewModel? _selectedAbonado;
         private string _searchText = "";
         private string _subTitle = "";
         private bool _canEdit = false;
-        private bool _hasSelectedAbonado = false;
+        private bool _selectAll = false;
+        private bool _updatingSelection = false;
 
-        // Filtros
-        private List<FilterItem> _estadoFilter;
-        private int? _selectedEstadoFilter;
+        // Filtros - cambio a usar objetos completos en lugar de IDs
+        private ObservableCollection<Gestor> _gestoresFilter;
         private ObservableCollection<Peña> _peñasFilter;
-        private int? _selectedPeñaFilter;
         private ObservableCollection<TipoAbono> _tiposAbonoFilter;
-        private int? _selectedTipoAbonoFilter;
+        private ObservableCollection<EstadoFilterItem> _estadosFilter;
+        private ObservableCollection<ImpresoFilterItem> _impresosFilter;
+
+        private Gestor? _selectedGestorFilter;
+        private Peña? _selectedPeñaFilter;
+        private TipoAbono? _selectedTipoAbonoFilter;
+        private EstadoFilterItem? _selectedEstadoFilter;
+        private ImpresoFilterItem? _selectedImpresoFilter;
 
         public AbonadosViewModel()
         {
             _dbContext = new ClubDbContext();
             _licenseService = new LicenseService();
 
-            _abonados = new ObservableCollection<Abonado>();
-            _abonadosFiltered = new ObservableCollection<Abonado>();
-            _estadoFilter = new List<FilterItem>();
+            _abonados = new ObservableCollection<AbonadoSelectableViewModel>();
+            _abonadosFiltered = new ObservableCollection<AbonadoSelectableViewModel>();
+            _gestoresFilter = new ObservableCollection<Gestor>();
             _peñasFilter = new ObservableCollection<Peña>();
             _tiposAbonoFilter = new ObservableCollection<TipoAbono>();
+            _estadosFilter = new ObservableCollection<EstadoFilterItem>();
+            _impresosFilter = new ObservableCollection<ImpresoFilterItem>();
 
             InitializeCommands();
             InitializeFilters();
+            LoadFilters();
             LoadData();
             UpdateCanEdit();
         }
 
         #region Properties
 
-        public ObservableCollection<Abonado> AbonadosFiltered
+        public ObservableCollection<AbonadoSelectableViewModel> AbonadosFiltered
         {
             get => _abonadosFiltered;
-            set { _abonadosFiltered = value; OnPropertyChanged(); }
+            set => SetProperty(ref _abonadosFiltered, value);
         }
 
-        public Abonado? SelectedAbonado
+        public AbonadoSelectableViewModel? SelectedAbonado
         {
             get => _selectedAbonado;
-            set
-            {
-                _selectedAbonado = value;
-                OnPropertyChanged();
-                HasSelectedAbonado = value != null;
-            }
+            set => SetProperty(ref _selectedAbonado, value);
         }
 
         public string SearchText
@@ -79,8 +79,7 @@ namespace ClubManager.ViewModels
             get => _searchText;
             set
             {
-                _searchText = value;
-                OnPropertyChanged();
+                SetProperty(ref _searchText, value);
                 ApplyFilters();
             }
         }
@@ -88,117 +87,450 @@ namespace ClubManager.ViewModels
         public string SubTitle
         {
             get => _subTitle;
-            set { _subTitle = value; OnPropertyChanged(); }
+            set => SetProperty(ref _subTitle, value);
         }
 
         public bool CanEdit
         {
             get => _canEdit;
-            set { _canEdit = value; OnPropertyChanged(); }
+            set => SetProperty(ref _canEdit, value);
         }
 
-        public bool HasSelectedAbonado
+        public bool SelectAll
         {
-            get => _hasSelectedAbonado;
-            set { _hasSelectedAbonado = value; OnPropertyChanged(); }
-        }
-
-        // Filtros
-        public List<FilterItem> EstadoFilter
-        {
-            get => _estadoFilter;
-            set { _estadoFilter = value; OnPropertyChanged(); }
-        }
-
-        public int? SelectedEstadoFilter
-        {
-            get => _selectedEstadoFilter;
+            get => _selectAll;
             set
             {
-                _selectedEstadoFilter = value;
-                OnPropertyChanged();
-                ApplyFilters();
+                if (_selectAll != value)
+                {
+                    _selectAll = value;
+                    OnPropertyChanged();
+
+                    // Solo llamar UpdateAllSelection si el cambio viene del usuario, no de la lógica interna
+                    if (!_updatingSelection)
+                    {
+                        UpdateAllSelection();
+                    }
+                }
             }
         }
+        public int SelectedCount => AbonadosFiltered.Count(a => a.IsSelected);
 
-        public ObservableCollection<Peña> PeñasFilter
+        public bool HasSelectedItems => SelectedCount > 0;
+
+        // Propiedades de filtros
+        public ObservableCollection<Gestor> GestoresFilter => _gestoresFilter;
+        public ObservableCollection<Peña> PeñasFilter => _peñasFilter;
+        public ObservableCollection<TipoAbono> TiposAbonoFilter => _tiposAbonoFilter;
+        public ObservableCollection<EstadoFilterItem> EstadosFilter => _estadosFilter;
+        public ObservableCollection<ImpresoFilterItem> ImpresosFilter => _impresosFilter;
+
+        public Gestor? SelectedGestorFilter
         {
-            get => _peñasFilter;
-            set { _peñasFilter = value; OnPropertyChanged(); }
+            get => _selectedGestorFilter;
+            set { SetProperty(ref _selectedGestorFilter, value); ApplyFilters(); }
         }
 
-        public int? SelectedPeñaFilter
+        public Peña? SelectedPeñaFilter
         {
             get => _selectedPeñaFilter;
-            set
-            {
-                _selectedPeñaFilter = value;
-                OnPropertyChanged();
-                ApplyFilters();
-            }
+            set { SetProperty(ref _selectedPeñaFilter, value); ApplyFilters(); }
         }
 
-        public ObservableCollection<TipoAbono> TiposAbonoFilter
-        {
-            get => _tiposAbonoFilter;
-            set { _tiposAbonoFilter = value; OnPropertyChanged(); }
-        }
-
-        public int? SelectedTipoAbonoFilter
+        public TipoAbono? SelectedTipoAbonoFilter
         {
             get => _selectedTipoAbonoFilter;
-            set
-            {
-                _selectedTipoAbonoFilter = value;
-                OnPropertyChanged();
-                ApplyFilters();
-            }
+            set { SetProperty(ref _selectedTipoAbonoFilter, value); ApplyFilters(); }
+        }
+
+        public EstadoFilterItem? SelectedEstadoFilter
+        {
+            get => _selectedEstadoFilter;
+            set { SetProperty(ref _selectedEstadoFilter, value); ApplyFilters(); }
+        }
+
+        public ImpresoFilterItem? SelectedImpresoFilter
+        {
+            get => _selectedImpresoFilter;
+            set { SetProperty(ref _selectedImpresoFilter, value); ApplyFilters(); }
         }
 
         #endregion
 
         #region Commands
 
-        public ICommand NewAbonadoCommand { get; private set; }
-        public ICommand EditAbonadoCommand { get; private set; }
-        public ICommand DeleteAbonadoCommand { get; private set; }
-        public ICommand MarkAsPrintedCommand { get; private set; }
-        public ICommand ShowStatsCommand { get; private set; }
-        public ICommand PrintCommand { get; private set; }
-        public ICommand ClearFiltersCommand { get; private set; }
-        public ICommand ExportCommand { get; private set; }
+        public ICommand NewAbonadoCommand { get; private set; } = null!;
+        public ICommand EditAbonadoCommand { get; private set; } = null!;
+        public ICommand DeleteAbonadoCommand { get; private set; } = null!;
+        public ICommand ToggleEstadoCommand { get; private set; } = null!;
+        public ICommand MarkAsPrintedCommand { get; private set; } = null!;
+        public ICommand ClearFiltersCommand { get; private set; } = null!;
+        public ICommand ExportCommand { get; private set; } = null!;
+        public ICommand PrintSelectedCommand { get; private set; } = null!;
 
-        #endregion
-
-        #region Initialization
+        // Comandos para acciones múltiples
+        public ICommand DeleteSelectedCommand { get; private set; } = null!;
+        public ICommand ActivateSelectedCommand { get; private set; } = null!;
+        public ICommand DeactivateSelectedCommand { get; private set; } = null!;
+        public ICommand MarkSelectedAsPrintedCommand { get; private set; } = null!;
+        public ICommand MarkSelectedAsNotPrintedCommand { get; private set; } = null!;
+        public ICommand ClearSelectionCommand { get; private set; } = null!;
 
         private void InitializeCommands()
         {
-            NewAbonadoCommand = new RelayCommand(NewAbonado);
-            EditAbonadoCommand = new RelayCommand<Abonado>(EditAbonado);
-            DeleteAbonadoCommand = new RelayCommand<Abonado>(DeleteAbonado);
-            MarkAsPrintedCommand = new RelayCommand<Abonado>(MarkAsPrinted);
-            ShowStatsCommand = new RelayCommand(ShowStats);
-            PrintCommand = new RelayCommand(PrintSelected);
+            NewAbonadoCommand = new RelayCommand(NewAbonado, () => CanEdit);
+            EditAbonadoCommand = new RelayCommand<AbonadoSelectableViewModel>(EditAbonado, a => CanEdit && a != null);
+            DeleteAbonadoCommand = new RelayCommand<AbonadoSelectableViewModel>(DeleteAbonado, a => CanEdit && a != null);
+            ToggleEstadoCommand = new RelayCommand<AbonadoSelectableViewModel>(ToggleEstado, a => CanEdit && a != null);
+            MarkAsPrintedCommand = new RelayCommand<AbonadoSelectableViewModel>(MarkAsPrinted, a => CanEdit && a != null);
             ClearFiltersCommand = new RelayCommand(ClearFilters);
             ExportCommand = new RelayCommand(ExportData);
+            PrintSelectedCommand = new RelayCommand(PrintSelected, () => SelectedAbonado != null);
+
+            // Comandos múltiples
+            DeleteSelectedCommand = new RelayCommand(DeleteSelected, () => CanEdit && HasSelectedItems);
+            ActivateSelectedCommand = new RelayCommand(ActivateSelected, () => CanEdit && HasSelectedItems);
+            DeactivateSelectedCommand = new RelayCommand(DeactivateSelected, () => CanEdit && HasSelectedItems);
+            MarkSelectedAsPrintedCommand = new RelayCommand(MarkSelectedAsPrinted, () => CanEdit && HasSelectedItems);
+            MarkSelectedAsNotPrintedCommand = new RelayCommand(MarkSelectedAsNotPrinted, () => CanEdit && HasSelectedItems);
+            ClearSelectionCommand = new RelayCommand(ClearSelection, () => HasSelectedItems);
         }
+
+        #endregion
+
+        #region Command Methods
+
+        private void NewAbonado()
+        {
+            try
+            {
+                var editWindow = new AbonadoEditWindow();
+                if (editWindow.ShowDialog() == true)
+                {
+                    LoadData();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al crear abonado: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void EditAbonado(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            try
+            {
+                var editWindow = new AbonadoEditWindow(abonadoVm.Abonado);
+                if (editWindow.ShowDialog() == true)
+                {
+                    LoadData();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al editar abonado: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeleteAbonado(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            var abonado = abonadoVm.Abonado;
+            var result = MessageBox.Show(
+                $"¿Está seguro de eliminar al abonado {abonado.NombreCompleto}?\n\nEsta acción no se puede deshacer.",
+                "Confirmar Eliminación",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    _dbContext.Abonados.Remove(abonado);
+                    await _dbContext.SaveChangesAsync();
+
+                    await LogAction($"Eliminado abonado: {abonado.NombreCompleto}");
+                    LoadData();
+
+                    MessageBox.Show("Abonado eliminado correctamente.", "Éxito",
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al eliminar abonado: {ex.Message}", "Error",
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void ToggleEstado(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            var abonado = abonadoVm.Abonado;
+            try
+            {
+                var nuevoEstado = abonado.Estado == EstadoAbonado.Activo ? EstadoAbonado.Inactivo : EstadoAbonado.Activo;
+                abonado.Estado = nuevoEstado;
+
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Cambio estado abonado {abonado.NombreCompleto}: {nuevoEstado}");
+
+                // Refrescar la vista
+                abonadoVm.NotifyPropertyChanged(nameof(abonadoVm.Abonado));
+                UpdateSubTitle();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cambiar estado: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void MarkAsPrinted(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            var abonado = abonadoVm.Abonado;
+            try
+            {
+                abonado.Impreso = !abonado.Impreso;
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Marcado como {(abonado.Impreso ? "impreso" : "no impreso")}: {abonado.NombreCompleto}");
+
+                // Refrescar la vista
+                abonadoVm.NotifyPropertyChanged(nameof(abonadoVm.Abonado));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al marcar impresión: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ClearFilters()
+        {
+            SearchText = "";
+            // Seleccionar los primeros elementos (que son "Todos...")
+            SelectedGestorFilter = _gestoresFilter.FirstOrDefault();
+            SelectedPeñaFilter = _peñasFilter.FirstOrDefault();
+            SelectedTipoAbonoFilter = _tiposAbonoFilter.FirstOrDefault();
+            SelectedEstadoFilter = _estadosFilter.FirstOrDefault();
+            SelectedImpresoFilter = _impresosFilter.FirstOrDefault();
+        }
+
+        private void ExportData()
+        {
+            MessageBox.Show("Funcionalidad de exportación - Próximamente", "Información",
+                          MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void PrintSelected()
+        {
+            if (SelectedAbonado?.Abonado == null) return;
+
+            MessageBox.Show($"Imprimir tarjeta de {SelectedAbonado.Abonado.NombreCompleto} - Próximamente", "Información",
+                          MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        #endregion
+
+        #region Multiple Selection Commands
+
+        private async void DeleteSelected()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            var result = MessageBox.Show(
+                $"¿Está seguro de eliminar {selectedItems.Count} abonado(s) seleccionado(s)?\n\nEsta acción no se puede deshacer.",
+                "Confirmar Eliminación Múltiple",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var abonados = selectedItems.Select(vm => vm.Abonado).ToList();
+                    _dbContext.Abonados.RemoveRange(abonados);
+                    await _dbContext.SaveChangesAsync();
+
+                    await LogAction($"Eliminados {selectedItems.Count} abonados en lote");
+                    LoadData();
+
+                    MessageBox.Show($"{selectedItems.Count} abonado(s) eliminado(s) correctamente.", "Éxito",
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al eliminar abonados: {ex.Message}", "Error",
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void ActivateSelected()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            try
+            {
+                foreach (var item in selectedItems)
+                {
+                    item.Abonado.Estado = EstadoAbonado.Activo;
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Activados {selectedItems.Count} abonados en lote");
+
+                // Refrescar vista
+                foreach (var item in selectedItems)
+                {
+                    item.NotifyPropertyChanged(nameof(item.Abonado));
+                }
+                UpdateSubTitle();
+
+                MessageBox.Show($"{selectedItems.Count} abonado(s) activado(s) correctamente.", "Éxito",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al activar abonados: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeactivateSelected()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            try
+            {
+                foreach (var item in selectedItems)
+                {
+                    item.Abonado.Estado = EstadoAbonado.Inactivo;
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Desactivados {selectedItems.Count} abonados en lote");
+
+                // Refrescar vista
+                foreach (var item in selectedItems)
+                {
+                    item.NotifyPropertyChanged(nameof(item.Abonado));
+                }
+                UpdateSubTitle();
+
+                MessageBox.Show($"{selectedItems.Count} abonado(s) desactivado(s) correctamente.", "Éxito",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al desactivar abonados: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void MarkSelectedAsPrinted()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            try
+            {
+                foreach (var item in selectedItems)
+                {
+                    item.Abonado.Impreso = true;
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Marcados como impresos {selectedItems.Count} abonados en lote");
+
+                // Refrescar vista
+                foreach (var item in selectedItems)
+                {
+                    item.NotifyPropertyChanged(nameof(item.Abonado));
+                }
+
+                MessageBox.Show($"{selectedItems.Count} abonado(s) marcado(s) como impresos.", "Éxito",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al marcar como impresos: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void MarkSelectedAsNotPrinted()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            try
+            {
+                foreach (var item in selectedItems)
+                {
+                    item.Abonado.Impreso = false;
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await LogAction($"Marcados como no impresos {selectedItems.Count} abonados en lote");
+
+                // Refrescar vista
+                foreach (var item in selectedItems)
+                {
+                    item.NotifyPropertyChanged(nameof(item.Abonado));
+                }
+
+                MessageBox.Show($"{selectedItems.Count} abonado(s) marcado(s) como no impresos.", "Éxito",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al marcar como no impresos: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ClearSelection()
+        {
+            foreach (var item in AbonadosFiltered)
+            {
+                item.IsSelected = false;
+            }
+            UpdateSelectionProperties();
+        }
+
+        #endregion
+
+        #region Methods
 
         private void InitializeFilters()
         {
-            EstadoFilter = new List<FilterItem>
-            {
-                new FilterItem { Display = "Todos", Value = null },
-                new FilterItem { Display = "Activos", Value = (int)EstadoAbonado.Activo },
-                new FilterItem { Display = "Inactivos", Value = (int)EstadoAbonado.Inactivo }
-            };
+            // Inicializar filtros de estado
+            _estadosFilter.Add(new EstadoFilterItem { Value = null, Texto = "Todos los estados" });
+            _estadosFilter.Add(new EstadoFilterItem { Value = EstadoAbonado.Activo, Texto = "Activos" });
+            _estadosFilter.Add(new EstadoFilterItem { Value = EstadoAbonado.Inactivo, Texto = "Inactivos" });
+
+            // Inicializar filtros de impreso
+            _impresosFilter.Add(new ImpresoFilterItem { Value = null, Texto = "Todos" });
+            _impresosFilter.Add(new ImpresoFilterItem { Value = true, Texto = "Impresos" });
+            _impresosFilter.Add(new ImpresoFilterItem { Value = false, Texto = "No impresos" });
         }
 
         private async void LoadData()
         {
             try
             {
-                // Cargar abonados con sus relaciones
                 var abonados = await _dbContext.Abonados
                     .Include(a => a.Gestor)
                     .Include(a => a.Peña)
@@ -209,61 +541,63 @@ namespace ClubManager.ViewModels
                 _abonados.Clear();
                 foreach (var abonado in abonados)
                 {
-                    _abonados.Add(abonado);
+                    var vm = new AbonadoSelectableViewModel(abonado);
+                    vm.SelectionChanged += OnItemSelectionChanged;
+                    _abonados.Add(vm);
                 }
 
-                // Cargar filtros
-                await LoadFilters();
-
                 ApplyFilters();
-                UpdateSubTitle();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar los datos: {ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error al cargar abonados: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private async Task LoadFilters()
+        private async void LoadFilters()
         {
             try
             {
-                // Cargar peñas para filtro
-                var peñas = await _dbContext.Peñas.OrderBy(p => p.Nombre).ToListAsync();
-                PeñasFilter.Clear();
-                PeñasFilter.Add(new Peña { Id = 0, Nombre = "Todas las peñas" });
-                foreach (var peña in peñas)
+                // Cargar gestores
+                var gestores = await _dbContext.Gestores.OrderBy(g => g.Nombre).ToListAsync();
+                _gestoresFilter.Clear();
+                _gestoresFilter.Add(new Gestor { Id = 0, Nombre = "Todos los gestores" });
+                foreach (var gestor in gestores)
                 {
-                    PeñasFilter.Add(peña);
+                    _gestoresFilter.Add(gestor);
                 }
 
-                // Cargar tipos de abono para filtro
-                var tiposAbono = await _dbContext.TiposAbono.OrderBy(t => t.Nombre).ToListAsync();
-                TiposAbonoFilter.Clear();
-                TiposAbonoFilter.Add(new TipoAbono { Id = 0, Nombre = "Todos los tipos" });
-                foreach (var tipo in tiposAbono)
+                // Cargar peñas
+                var peñas = await _dbContext.Peñas.OrderBy(p => p.Nombre).ToListAsync();
+                _peñasFilter.Clear();
+                _peñasFilter.Add(new Peña { Id = 0, Nombre = "Todas las peñas" });
+                foreach (var peña in peñas)
                 {
-                    TiposAbonoFilter.Add(tipo);
+                    _peñasFilter.Add(peña);
                 }
+
+                // Cargar tipos de abono
+                var tipos = await _dbContext.TiposAbono.OrderBy(t => t.Nombre).ToListAsync();
+                _tiposAbonoFilter.Clear();
+                _tiposAbonoFilter.Add(new TipoAbono { Id = 0, Nombre = "Todos los tipos" });
+                foreach (var tipo in tipos)
+                {
+                    _tiposAbonoFilter.Add(tipo);
+                }
+
+                // Establecer selecciones por defecto después de cargar
+                SelectedGestorFilter = _gestoresFilter.FirstOrDefault();
+                SelectedPeñaFilter = _peñasFilter.FirstOrDefault();
+                SelectedTipoAbonoFilter = _tiposAbonoFilter.FirstOrDefault();
+                SelectedEstadoFilter = _estadosFilter.FirstOrDefault();
+                SelectedImpresoFilter = _impresosFilter.FirstOrDefault();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar filtros: {ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"Error cargando filtros: {ex.Message}");
             }
         }
-
-        private void UpdateCanEdit()
-        {
-            _licenseService.LoadSavedLicense();
-            var licenseInfo = _licenseService.GetCurrentLicenseInfo();
-            CanEdit = licenseInfo.IsValid && !licenseInfo.IsExpired;
-        }
-
-        #endregion
-
-        #region Filtering
 
         private void ApplyFilters()
         {
@@ -271,34 +605,32 @@ namespace ClubManager.ViewModels
             {
                 var filtered = _abonados.AsEnumerable();
 
-                // Filtro por texto de búsqueda
+                // Filtro por texto
                 if (!string.IsNullOrWhiteSpace(SearchText))
                 {
                     var searchLower = SearchText.ToLower();
                     filtered = filtered.Where(a =>
-                        a.Nombre.ToLower().Contains(searchLower) ||
-                        a.Apellidos.ToLower().Contains(searchLower) ||
-                        a.DNI.ToLower().Contains(searchLower) ||
-                        a.NumeroSocio.ToString().Contains(searchLower));
+                        a.Abonado.Nombre.ToLower().Contains(searchLower) ||
+                        a.Abonado.Apellidos.ToLower().Contains(searchLower) ||
+                        (a.Abonado.DNI != null && a.Abonado.DNI.ToLower().Contains(searchLower)) ||
+                        a.Abonado.NumeroSocio.ToString().Contains(searchLower));
                 }
 
-                // Filtro por estado
-                if (SelectedEstadoFilter.HasValue)
-                {
-                    filtered = filtered.Where(a => (int)a.Estado == SelectedEstadoFilter.Value);
-                }
+                // Filtros por selección
+                if (SelectedGestorFilter != null && SelectedGestorFilter.Id > 0)
+                    filtered = filtered.Where(a => a.Abonado.GestorId == SelectedGestorFilter.Id);
 
-                // Filtro por peña
-                if (SelectedPeñaFilter.HasValue && SelectedPeñaFilter.Value > 0)
-                {
-                    filtered = filtered.Where(a => a.PeñaId == SelectedPeñaFilter.Value);
-                }
+                if (SelectedPeñaFilter != null && SelectedPeñaFilter.Id > 0)
+                    filtered = filtered.Where(a => a.Abonado.PeñaId == SelectedPeñaFilter.Id);
 
-                // Filtro por tipo de abono
-                if (SelectedTipoAbonoFilter.HasValue && SelectedTipoAbonoFilter.Value > 0)
-                {
-                    filtered = filtered.Where(a => a.TipoAbonoId == SelectedTipoAbonoFilter.Value);
-                }
+                if (SelectedTipoAbonoFilter != null && SelectedTipoAbonoFilter.Id > 0)
+                    filtered = filtered.Where(a => a.Abonado.TipoAbonoId == SelectedTipoAbonoFilter.Id);
+
+                if (SelectedEstadoFilter != null && SelectedEstadoFilter.Value.HasValue)
+                    filtered = filtered.Where(a => a.Abonado.Estado == SelectedEstadoFilter.Value.Value);
+
+                if (SelectedImpresoFilter != null && SelectedImpresoFilter.Value.HasValue)
+                    filtered = filtered.Where(a => a.Abonado.Impreso == SelectedImpresoFilter.Value.Value);
 
                 AbonadosFiltered.Clear();
                 foreach (var abonado in filtered)
@@ -307,287 +639,148 @@ namespace ClubManager.ViewModels
                 }
 
                 UpdateSubTitle();
+                UpdateSelectionProperties();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al aplicar filtros: {ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"Error aplicando filtros: {ex.Message}");
             }
         }
 
         private void UpdateSubTitle()
         {
-            var total = _abonados.Count;
-            var filtered = AbonadosFiltered.Count;
-            var activos = AbonadosFiltered.Count(a => a.Estado == EstadoAbonado.Activo);
+            var total = AbonadosFiltered.Count;
+            var activos = AbonadosFiltered.Count(a => a.Abonado.Estado == EstadoAbonado.Activo);
+            var impresos = AbonadosFiltered.Count(a => a.Abonado.Impreso);
+            var seleccionados = SelectedCount;
 
-            if (total == filtered)
+            if (seleccionados > 0)
             {
-                SubTitle = $"Total: {total} abonados • Activos: {activos}";
+                SubTitle = $"{total} abonados encontrados ({activos} activos, {impresos} impresos) - {seleccionados} seleccionados";
             }
             else
             {
-                SubTitle = $"Mostrando: {filtered} de {total} abonados • Activos: {activos}";
+                SubTitle = $"{total} abonados encontrados ({activos} activos, {impresos} impresos)";
             }
         }
 
-        #endregion
-
-        #region Command Methods
-
-        private void NewAbonado()
+        private void UpdateCanEdit()
         {
-            if (!CanEdit)
-            {
-                MessageBox.Show("No tienes permisos para crear abonados. Licencia expirada o inválida.",
-                               "Acceso Denegado", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            var editWindow = new Views.AbonadoEditWindow();
-            if (editWindow.ShowDialog() == true)
-            {
-                LoadData();
-            }
+            _licenseService.LoadSavedLicense();
+            var licenseInfo = _licenseService.GetCurrentLicenseInfo();
+            var permissions = UserSession.Instance.CurrentPermissions;
+            CanEdit = licenseInfo.IsValid && !licenseInfo.IsExpired &&
+                     permissions?.CanEditAbonados == true;
         }
 
-        private void EditAbonado(Abonado? abonado)
-        {
-            if (abonado == null || !CanEdit)
-            {
-                if (!CanEdit)
-                {
-                    MessageBox.Show("No tienes permisos para editar abonados. Licencia expirada o inválida.",
-                                   "Acceso Denegado", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                return;
-            }
-
-            if (abonado.Impreso)
-            {
-                var result = MessageBox.Show(
-                    $"El abonado '{abonado.NombreCompleto}' ya está marcado como impreso.\n\n" +
-                    "¿Estás seguro de que quieres modificar sus datos?",
-                    "Abonado Impreso",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-
-                if (result != MessageBoxResult.Yes)
-                    return;
-            }
-
-            var editWindow = new Views.AbonadoEditWindow(abonado);
-            if (editWindow.ShowDialog() == true)
-            {
-                LoadData();
-            }
-        }
-
-        private async void DeleteAbonado(Abonado? abonado)
-        {
-            if (abonado == null || !CanEdit)
-            {
-                if (!CanEdit)
-                {
-                    MessageBox.Show("No tienes permisos para eliminar abonados. Licencia expirada o inválida.",
-                                   "Acceso Denegado", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                return;
-            }
-
-            var result = MessageBox.Show(
-                $"¿Estás seguro de que quieres eliminar al abonado '{abonado.NombreCompleto}'?\n\n" +
-                "Esta acción no se puede deshacer.",
-                "Confirmar Eliminación",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    _dbContext.Abonados.Remove(abonado);
-                    await _dbContext.SaveChangesAsync();
-
-                    // Registrar en historial
-                    await LogAction($"Eliminó abonado: {abonado.NombreCompleto} (DNI: {abonado.DNI})");
-
-                    LoadData();
-
-                    MessageBox.Show("Abonado eliminado correctamente.", "Éxito",
-                                   MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al eliminar el abonado: {ex.Message}", "Error",
-                                   MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        private async void MarkAsPrinted(Abonado? abonado)
-        {
-            if (abonado == null || !CanEdit)
-            {
-                if (!CanEdit)
-                {
-                    MessageBox.Show("No tienes permisos para marcar como impreso. Licencia expirada o inválida.",
-                                   "Acceso Denegado", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                return;
-            }
-
-            try
-            {
-                abonado.Impreso = !abonado.Impreso;
-                await _dbContext.SaveChangesAsync();
-
-                var accion = abonado.Impreso ? "marcó como impreso" : "desmarcó como impreso";
-                await LogAction($"{accion} abonado: {abonado.NombreCompleto}");
-
-                ApplyFilters(); // Actualizar vista sin recargar todo
-
-                var mensaje = abonado.Impreso ? "marcado como impreso" : "desmarcado como impreso";
-                MessageBox.Show($"Abonado {mensaje} correctamente.", "Éxito",
-                               MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al actualizar el estado: {ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void ShowStats()
-        {
-            var statsWindow = new StatsWindow(_abonados.ToList());
-            statsWindow.ShowDialog();
-        }
-
-        private void PrintSelected()
-        {
-            if (SelectedAbonado == null)
-            {
-                MessageBox.Show("Selecciona un abonado para imprimir.", "Información",
-                               MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // Por ahora solo marcar como impreso
-            MarkAsPrinted(SelectedAbonado);
-        }
-
-        private void ClearFilters()
-        {
-            SearchText = "";
-            SelectedEstadoFilter = null;
-            SelectedPeñaFilter = null;
-            SelectedTipoAbonoFilter = null;
-        }
-
-        private void ExportData()
-        {
-            try
-            {
-                var exportWindow = new Views.ExportWindow(AbonadosFiltered.ToList());
-                exportWindow.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al exportar: {ex.Message}", "Error",
-                               MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        #endregion
-
-        #region Helper Methods
-
-        private async Task LogAction(string accion)
+        private async Task LogAction(string action)
         {
             try
             {
                 var historial = new HistorialAccion
                 {
-                    UsuarioId = 1, // Por ahora usuario por defecto
-                    Accion = accion,
+                    UsuarioId = UserSession.Instance.CurrentUser?.Id ?? 1,
+                    Accion = action,
+                    TipoAccion = "Abonados",
                     FechaHora = DateTime.Now
                 };
 
                 _dbContext.HistorialAcciones.Add(historial);
                 await _dbContext.SaveChangesAsync();
             }
-            catch
+            catch { }
+        }
+
+        private void UpdateAllSelection()
+        {
+            // Temporalmente desconectar los eventos para evitar bucles
+            foreach (var item in AbonadosFiltered)
             {
-                // Si falla el log, no es crítico
+                item.SelectionChanged -= OnItemSelectionChanged;
+                item.IsSelected = SelectAll;
+                item.SelectionChanged += OnItemSelectionChanged;
+            }
+            UpdateSelectionProperties();
+        }
+
+        private void OnItemSelectionChanged()
+        {
+            UpdateSelectionProperties();
+        }
+
+        private void UpdateSelectionProperties()
+        {
+            OnPropertyChanged(nameof(SelectedCount));
+            OnPropertyChanged(nameof(HasSelectedItems));
+
+            // Actualizar SelectAll - se marca si TODOS los elementos están seleccionados
+            var allSelected = AbonadosFiltered.Any() && AbonadosFiltered.All(a => a.IsSelected);
+
+            // Solo actualizar si el valor realmente cambió para evitar bucles infinitos
+            if (_selectAll != allSelected)
+            {
+                _selectAll = allSelected;
+                OnPropertyChanged(nameof(SelectAll));
+            }
+
+            UpdateSubTitle();
+        }
+
+        #endregion
+    }
+
+    // ViewModel para elementos seleccionables
+    public class AbonadoSelectableViewModel : BaseViewModel
+    {
+        private bool _isSelected;
+        public Abonado Abonado { get; }
+
+        public AbonadoSelectableViewModel(Abonado abonado)
+        {
+            Abonado = abonado;
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (SetProperty(ref _isSelected, value))
+                {
+                    SelectionChanged?.Invoke();
+                }
             }
         }
 
-        #endregion
+        public event Action? SelectionChanged;
 
-        #region INotifyPropertyChanged
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        // Método público para notificar cambios en propiedades
+        public void NotifyPropertyChanged(string propertyName)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            OnPropertyChanged(propertyName);
         }
-
-        #endregion
-
-        #region IDisposable
-
-        public void Dispose()
-        {
-            _dbContext?.Dispose();
-        }
-
-        #endregion
     }
 
-    #region Helper Classes
-
-    public class FilterItem
+    // Clases auxiliares para los filtros
+    public class EstadoFilterItem
     {
-        public string Display { get; set; } = "";
-        public int? Value { get; set; }
-    }
+        public EstadoAbonado? Value { get; set; }
+        public string Texto { get; set; } = "";
 
-    // Placeholder windows - se implementarán después
-    public class StatsWindow : Window
-    {
-        public StatsWindow(List<Abonado> abonados)
+        public override string ToString()
         {
-            Title = "Estadísticas";
-            Width = 500;
-            Height = 400;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Content = new TextBlock
-            {
-                Text = $"Estadísticas de {abonados.Count} abonados - Próximamente",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            return Texto;
         }
     }
 
-    public class ExportWindow : Window
+    public class ImpresoFilterItem
     {
-        public ExportWindow(List<Abonado> abonados)
+        public bool? Value { get; set; }
+        public string Texto { get; set; } = "";
+
+        public override string ToString()
         {
-            Title = "Exportar Datos";
-            Width = 400;
-            Height = 300;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Content = new System.Windows.Controls.TextBlock
-            {
-                Text = $"Exportar {abonados.Count} abonados - Cargando...",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            return Texto;
         }
     }
-
-    #endregion
 }

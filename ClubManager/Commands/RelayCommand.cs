@@ -20,15 +20,8 @@ namespace ClubManager.Commands
             remove { CommandManager.RequerySuggested -= value; }
         }
 
-        public bool CanExecute(object? parameter)
-        {
-            return _canExecute?.Invoke() ?? true;
-        }
-
-        public void Execute(object? parameter)
-        {
-            _execute();
-        }
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+        public void Execute(object? parameter) => _execute();
     }
 
     public class RelayCommand<T> : ICommand
@@ -48,14 +41,7 @@ namespace ClubManager.Commands
             remove { CommandManager.RequerySuggested -= value; }
         }
 
-        public bool CanExecute(object? parameter)
-        {
-            return _canExecute?.Invoke((T?)parameter) ?? true;
-        }
-
-        public void Execute(object? parameter)
-        {
-            _execute((T?)parameter);
-        }
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke((T?)parameter) ?? true;
+        public void Execute(object? parameter) => _execute((T?)parameter);
     }
 }

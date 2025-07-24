@@ -1,28 +1,19 @@
 ﻿<UserControl x:Class="ClubManager.Views.AbonadosView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
-             xmlns:local="clr-namespace:ClubManager.Views"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource BackgroundBrush}">
-
-    <UserControl.Resources>
-        <!-- Convertidores para estados -->
-        <local:EstadoToColorConverter x:Key="EstadoToColorConverter"/>
-        <local:BoolToColorConverter x:Key="BoolToColorConverter"/>
-        <local:BoolToTextConverter x:Key="BoolToTextConverter"/>
-    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" 
-                Background="{DynamicResource SecondaryBackgroundBrush}" 
-                CornerRadius="8,8,0,0" 
-                Padding="20,15">
+        <Border Grid.Row="0" Style="{StaticResource ModernBorder}" 
+                CornerRadius="8,8,0,0" Margin="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -30,7 +21,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <Label Content="👥 Gestión de Abonados" 
+                    <Label Content="👤 Gestión de Abonados" 
                            Foreground="{DynamicResource ForegroundBrush}" 
                            FontSize="20" FontWeight="Bold" Margin="0"/>
                     <TextBlock Text="{Binding SubTitle}" 
@@ -44,210 +35,370 @@
                             Command="{Binding NewAbonadoCommand}"
                             IsEnabled="{Binding CanEdit}"
                             Margin="0,0,10,0"/>
-                    <Button Content="📊 Estadísticas" 
-                            Style="{StaticResource ModernButton}"
-                            Command="{Binding ShowStatsCommand}"
-                            Margin="0,0,10,0"/>
                     <Button Content="🖨️ Imprimir" 
                             Style="{StaticResource ModernButton}"
-                            Command="{Binding PrintCommand}"
-                            IsEnabled="{Binding HasSelectedAbonado}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- Filtros y Búsqueda -->
-        <Border Grid.Row="1" 
-                Background="{DynamicResource BorderBrush}" 
-                Padding="20,15">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="250"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0">
-                    <Label Content="🔍 Buscar:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <TextBox x:Name="txtBuscar" 
-                             Style="{StaticResource ModernTextBox}"
-                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Buscar por nombre, apellidos, DNI o número de socio"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" Margin="15,0,0,0">
-                    <Label Content="Estado:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <ComboBox Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding EstadoFilter}"
-                              SelectedValue="{Binding SelectedEstadoFilter}"
-                              DisplayMemberPath="Display"
-                              SelectedValuePath="Value"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Margin="15,0,0,0">
-                    <Label Content="Peña:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <ComboBox Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding PeñasFilter}"
-                              SelectedValue="{Binding SelectedPeñaFilter}"
-                              DisplayMemberPath="Nombre"
-                              SelectedValuePath="Id"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="3" Margin="15,0,0,0">
-                    <Label Content="Tipo Abono:" 
-                           Foreground="{DynamicResource ForegroundBrush}" 
-                           FontSize="12" Margin="0"/>
-                    <ComboBox Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding TiposAbonoFilter}"
-                              SelectedValue="{Binding SelectedTipoAbonoFilter}"
-                              DisplayMemberPath="Nombre"
-                              SelectedValuePath="Id"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Bottom">
-                    <Button Content="🗑️ Limpiar" 
-                            Style="{StaticResource ModernButton}"
-                            Command="{Binding ClearFiltersCommand}"
+                            Command="{Binding PrintSelectedCommand}"
+                            IsEnabled="{Binding CanEdit}"
                             Margin="0,0,10,0"/>
-                    <Button Content="📤 Exportar" 
-                            Style="{StaticResource ModernButton}"
+                    <Button Content="📊 Exportar" 
+                            Style="{StaticResource InfoButton}"
                             Command="{Binding ExportCommand}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- DataGrid -->
-        <Border Grid.Row="2" 
-                Background="{DynamicResource SecondaryBackgroundBrush}" 
-                CornerRadius="0,0,8,8" 
-                Margin="0,1,0,0">
-            <DataGrid x:Name="dgAbonados"
-                      Style="{StaticResource DataGridStyle}"
-                      ItemsSource="{Binding AbonadosFiltered}"
-                      SelectedItem="{Binding SelectedAbonado}"
-                      ColumnHeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+        <!-- Filtros -->
+        <Border Grid.Row="1" Style="{StaticResource ModernBorder}" 
+                CornerRadius="0" Margin="0,0,0,1">
+            <Expander Header="🔍 Filtros de Búsqueda" IsExpanded="True">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <DataGrid.Columns>
-                    <!-- Número de Socio -->
-                    <DataGridTextColumn Header="Nº Socio" 
-                                        Binding="{Binding NumeroSocio}" 
-                                        Width="80"/>
+                    <!-- Primera fila -->
+                    <!-- TextBox de búsqueda -->
+                    <TextBox Grid.Row="0" Grid.Column="0" 
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="14" Height="35" Padding="8"
+                             Background="{DynamicResource TextBoxBackgroundBrush}"
+                             Foreground="{DynamicResource TextBoxForegroundBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                             VerticalContentAlignment="Center"
+                             Margin="5"/>
 
-                    <!-- Nombre Completo -->
-                    <DataGridTextColumn Header="Nombre Completo" 
-                                        Binding="{Binding NombreCompleto}" 
-                                        Width="200"/>
+                    <!-- Placeholder para el TextBox -->
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Buscar por nombre, DNI o número de socio..."
+                               Foreground="{DynamicResource MutedBrush}"
+                               FontStyle="Italic" FontSize="12"
+                               IsHitTestVisible="False"
+                               VerticalAlignment="Center"
+                               Margin="13,0,0,0">
+                        <TextBlock.Visibility>
+                            <Binding Path="SearchText" Converter="{StaticResource StringToVisibilityConverter}" ConverterParameter="Invert"/>
+                        </TextBlock.Visibility>
+                    </TextBlock>
 
-                    <!-- DNI -->
-                    <DataGridTextColumn Header="DNI" 
-                                        Binding="{Binding DNI}" 
-                                        Width="100"/>
+                    <!-- ComboBox Gestores -->
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              ItemsSource="{Binding GestoresFilter}"
+                              SelectedItem="{Binding SelectedGestorFilter}"
+                              DisplayMemberPath="Nombre"
+                              FontSize="14" Height="35" Padding="8"
+                              Background="{DynamicResource TextBoxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBoxForegroundBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                              Margin="5"/>
 
-                    <!-- Estado con color -->
-                    <DataGridTemplateColumn Header="Estado" Width="80">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border Background="{Binding Estado, Converter={StaticResource EstadoToColorConverter}}" 
-                                        CornerRadius="12" Padding="8,4">
-                                    <TextBlock Text="{Binding EstadoTexto}" 
-                                               Foreground="White" 
-                                               FontSize="10" 
-                                               FontWeight="Bold"
-                                               HorizontalAlignment="Center"/>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <!-- ComboBox Peñas -->
+                    <ComboBox Grid.Row="0" Grid.Column="2"
+                              ItemsSource="{Binding PeñasFilter}"
+                              SelectedItem="{Binding SelectedPeñaFilter}"
+                              DisplayMemberPath="Nombre"
+                              FontSize="14" Height="35" Padding="8"
+                              Background="{DynamicResource TextBoxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBoxForegroundBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                              Margin="5"/>
 
-                    <!-- Peña -->
-                    <DataGridTextColumn Header="Peña" 
-                                        Binding="{Binding Peña.Nombre}" 
-                                        Width="120"/>
+                    <!-- ComboBox Tipos de Abono -->
+                    <ComboBox Grid.Row="0" Grid.Column="3"
+                              ItemsSource="{Binding TiposAbonoFilter}"
+                              SelectedItem="{Binding SelectedTipoAbonoFilter}"
+                              DisplayMemberPath="Nombre"
+                              FontSize="14" Height="35" Padding="8"
+                              Background="{DynamicResource TextBoxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBoxForegroundBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                              Margin="5"/>
 
-                    <!-- Tipo de Abono -->
-                    <DataGridTextColumn Header="Tipo Abono" 
-                                        Binding="{Binding TipoAbono.Nombre}" 
-                                        Width="120"/>
+                    <!-- ComboBox Estados -->
+                    <ComboBox Grid.Row="0" Grid.Column="4"
+                              ItemsSource="{Binding EstadosFilter}"
+                              SelectedItem="{Binding SelectedEstadoFilter}"
+                              DisplayMemberPath="Texto"
+                              FontSize="14" Height="35" Padding="8"
+                              Background="{DynamicResource TextBoxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBoxForegroundBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                              Margin="5"/>
 
-                    <!-- Precio -->
-                    <DataGridTextColumn Header="Precio" 
-                                        Binding="{Binding TipoAbono.Precio, StringFormat='{}{0:C}'}" 
-                                        Width="80"/>
+                    <!-- ComboBox Impresos -->
+                    <ComboBox Grid.Row="0" Grid.Column="5"
+                              ItemsSource="{Binding ImpresosFilter}"
+                              SelectedItem="{Binding SelectedImpresoFilter}"
+                              DisplayMemberPath="Texto"
+                              FontSize="14" Height="35" Padding="8"
+                              Background="{DynamicResource TextBoxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBoxForegroundBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                              Margin="5"/>
 
-                    <!-- Impreso -->
-                    <DataGridTemplateColumn Header="Impreso" Width="70">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Border Background="{Binding Impreso, Converter={StaticResource BoolToColorConverter}}" 
-                                        CornerRadius="4" Padding="4">
-                                    <TextBlock Text="{Binding Impreso, Converter={StaticResource BoolToTextConverter}}" 
-                                               Foreground="White" 
-                                               FontSize="10"
-                                               HorizontalAlignment="Center"/>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Código de Barras -->
-                    <DataGridTextColumn Header="Código Barras" 
-                                        Binding="{Binding CodigoBarras}" 
-                                        Width="150"/>
-
-                    <!-- Acciones -->
-                    <DataGridTemplateColumn Header="Acciones" Width="200">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Button Content="✏️" 
-                                            Style="{StaticResource ModernButton}"
-                                            Command="{Binding DataContext.EditAbonadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            ToolTip="Editar"
-                                            Margin="2" Padding="6,4"/>
-                                    <Button Content="🗑️" 
-                                            Style="{StaticResource DangerButton}"
-                                            Command="{Binding DataContext.DeleteAbonadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            ToolTip="Eliminar"
-                                            Margin="2" Padding="6,4"/>
-                                    <Button Content="🖨️" 
-                                            Style="{StaticResource ModernButton}"
-                                            Command="{Binding DataContext.MarkAsPrintedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            ToolTip="Marcar como impreso"
-                                            Margin="2" Padding="6,4"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.RowStyle>
-            </DataGrid>
+                    <Button Grid.Row="0" Grid.Column="6"
+                            Content="🗑️ Limpiar"
+                            Style="{StaticResource WarningButton}"
+                            Command="{Binding ClearFiltersCommand}"
+                            Margin="5" Height="35" Width="80"/>
+                </Grid>
+            </Expander>
         </Border>
+
+        <!-- Barra de Acciones Múltiples -->
+        <Border Grid.Row="2" Style="{StaticResource ModernBorder}" 
+                CornerRadius="0" Margin="0,0,0,1"
+                Visibility="{Binding HasSelectedItems, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid Background="{DynamicResource InfoBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Información de selección -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="📋" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center">
+                        <TextBlock.Text>
+                            <Binding Path="SelectedCount" StringFormat="{}{0} elemento(s) seleccionado(s)"/>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Botones de acciones múltiples -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="✅ Activar" 
+                            Style="{StaticResource SuccessButton}"
+                            Command="{Binding ActivateSelectedCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="❌ Desactivar" 
+                            Style="{StaticResource WarningButton}"
+                            Command="{Binding DeactivateSelectedCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="🖨️ Marcar Impresos" 
+                            Style="{StaticResource InfoButton}"
+                            Command="{Binding MarkSelectedAsPrintedCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="📄 Marcar No Impresos" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding MarkSelectedAsNotPrintedCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="🗑️ Eliminar" 
+                            Style="{StaticResource DangerButton}"
+                            Command="{Binding DeleteSelectedCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="🚫 Limpiar Selección" 
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding ClearSelectionCommand}"
+                            Height="32" Padding="10,5"
+                            FontSize="12"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Lista de Abonados -->
+        <DataGrid Grid.Row="3" 
+                  ItemsSource="{Binding AbonadosFiltered}"
+                  SelectedItem="{Binding SelectedAbonado}"
+                  Style="{StaticResource DataGridStyle}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True"
+                  CanUserResizeRows="False">
+
+            <DataGrid.Resources>
+                <!-- Eliminar completamente los estilos de selección -->
+                <Style TargetType="{x:Type DataGridCell}">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type DataGridCell}">
+                                <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                SnapsToDevicePixels="True">
+                                    <ContentPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+
+                <Style TargetType="{x:Type DataGridRow}">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type DataGridRow}">
+                                <Border x:Name="DGR_Border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                SnapsToDevicePixels="True">
+                                    <DataGridCellsPresenter Grid.Column="1" 
+                                                    ItemsPanel="{TemplateBinding ItemsPanel}" 
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#10808080"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.Resources>
+
+            <DataGrid.Columns>
+                <!-- Checkbox para selección múltiple -->
+                <DataGridTemplateColumn Width="50" CanUserResize="False">
+                    <DataGridTemplateColumn.Header>
+                        <CheckBox IsChecked="{Binding DataContext.SelectAll, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Style="{StaticResource ModernCheckBox}"
+                                  ToolTip="Seleccionar/Deseleccionar todos"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Margin="5"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Número de Socio -->
+                <DataGridTextColumn Header="Nº Socio" 
+                                    Binding="{Binding Abonado.NumeroSocio}"
+                                    Width="80" 
+                                    ElementStyle="{StaticResource CenterTextBlock}"/>
+
+                <!-- Nombre Completo -->
+                <DataGridTextColumn Header="Nombre Completo" 
+                                    Binding="{Binding Abonado.NombreCompleto}"
+                                    Width="200"
+                                    ElementStyle="{StaticResource CenterLeftTextBlock}"/>
+
+                <!-- DNI -->
+                <DataGridTextColumn Header="DNI" 
+                                    Binding="{Binding Abonado.DNI}"
+                                    Width="100"
+                                    ElementStyle="{StaticResource CenterLeftTextBlock}"/>
+
+                <!-- Gestor -->
+                <DataGridTextColumn Header="Gestor" 
+                                    Binding="{Binding Abonado.Gestor.Nombre}"
+                                    Width="120"
+                                    ElementStyle="{StaticResource CenterLeftTextBlock}"/>
+
+                <!-- Peña -->
+                <DataGridTextColumn Header="Peña" 
+                                    Binding="{Binding Abonado.Peña.Nombre}"
+                                    Width="100"
+                                    ElementStyle="{StaticResource CenterLeftTextBlock}"/>
+
+                <!-- Tipo de Abono -->
+                <DataGridTextColumn Header="Tipo Abono" 
+                                    Binding="{Binding Abonado.TipoAbono.Nombre}"
+                                    Width="120"
+                                    ElementStyle="{StaticResource CenterLeftTextBlock}"/>
+
+                <!-- Estado -->
+                <DataGridTemplateColumn Header="Estado" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding Abonado.ColorEstado}" 
+                                    CornerRadius="12" Padding="8,4">
+                                <TextBlock Text="{Binding Abonado.EstadoTexto}" 
+                                           Foreground="White" 
+                                           FontSize="11" FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Impreso -->
+                <DataGridTemplateColumn Header="Impreso" Width="70">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Abonado.Impreso, Converter={StaticResource BoolToIconConverter}}" 
+                                       FontSize="16" 
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Fecha Creación -->
+                <DataGridTextColumn Header="Fecha Creación" 
+                                    Binding="{Binding Abonado.FechaCreacion, StringFormat=dd/MM/yyyy}"
+                                    Width="100"/>
+
+                <!-- Acciones -->
+                <DataGridTemplateColumn Header="Acciones" Width="200">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="✏️" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.EditAbonadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Editar"
+                                        Margin="2"/>
+
+                                <Button Content="{Binding Abonado.Estado, Converter={StaticResource EstadoToIconConverter}}" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.ToggleEstadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Cambiar Estado"
+                                        Margin="2"/>
+
+                                <Button Content="🖨️" 
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.MarkAsPrintedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Marcar Impreso"
+                                        Margin="2"/>
+
+                                <Button Content="🗑️" 
+                                        Style="{StaticResource DangerIconButton}"
+                                        Command="{Binding DataContext.DeleteAbonadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Eliminar"
+                                        Margin="2"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </UserControl>

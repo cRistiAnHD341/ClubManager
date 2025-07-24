@@ -1,11 +1,29 @@
 ﻿<Application x:Class="ClubManager.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Startup="Application_Startup">
+             xmlns:converters="clr-namespace:ClubManager.Converters">
+
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Convertidores Globales -->
+            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+            <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+            <converters:BoolToIconConverter x:Key="BoolToIconConverter"/>
+            <converters:EstadoToIconConverter x:Key="EstadoToIconConverter"/>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <converters:BoolToStatusTextConverter x:Key="BoolToStatusTextConverter"/>
+            <converters:RolToColorConverter x:Key="RolToColorConverter"/>
+            <converters:DecimalToEuroConverter x:Key="DecimalToEuroConverter"/>
+            <converters:NumberToColorConverter x:Key="NumberToColorConverter"/>
+
+            <!-- Brushes básicos -->
+            <SolidColorBrush x:Key="AlternateRowBrush" Color="#F8F9FA"/>
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="White"/>
+
             <ResourceDictionary.MergedDictionaries>
-                <!-- ORDEN IMPORTANTE: Primero los recursos, luego los estilos -->
+                <!-- ORDEN IMPORTANTE: Primero recursos, luego estilos -->
                 <ResourceDictionary Source="ThemeResources.xaml"/>
                 <ResourceDictionary Source="GlobalStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>

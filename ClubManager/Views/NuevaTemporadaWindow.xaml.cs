@@ -9,9 +9,8 @@ namespace ClubManager.Views
         {
             InitializeComponent();
             DataContext = new NuevaTemporadaViewModel();
-
             // Suscribirse al evento de temporada creada
-            if (DataContext is NuevaTemporadaViewModel viewModel)
+           /* if (DataContext is NuevaTemporadaViewModel viewModel)
             {
                 viewModel.SeasonCreated += (s, success) =>
                 {
@@ -21,7 +20,7 @@ namespace ClubManager.Views
                         Close();
                     }
                 };
-            }
+            }*/
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

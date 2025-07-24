@@ -1,0 +1,467 @@
+﻿<Window x:Class="ClubManager.Views.ReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:ClubManager.Converters"
+        Title="📊 Generador de Reportes - ClubManager" 
+        Height="800" Width="1200"
+        WindowStartupLocation="CenterScreen"
+        Style="{DynamicResource ModernWindowStyle}"
+        MinHeight="600" MinWidth="900">
+
+    <Window.Resources>
+        <!-- Converters -->
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <converters:NumberToColorConverter x:Key="NumberToColorConverter"/>
+
+        <!-- Estilos específicos -->
+        <Style x:Key="ReportCategoryHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+        </Style>
+
+        <Style x:Key="ReportButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuickReportButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource AccentBrush}" Padding="25,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="📊 Generador de Reportes" 
+                               FontSize="26" FontWeight="Bold" 
+                               Foreground="White"/>
+                    <TextBlock Text="Genera informes detallados y estadísticas del sistema" 
+                               FontSize="15" 
+                               Foreground="White" Opacity="0.9"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               Foreground="White" 
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Margin="0,0,20,0"/>
+
+                    <Button Content="✖️ Cerrar" 
+                            Style="{StaticResource ModernButton}"
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderBrush="White"
+                            Click="CerrarButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="350"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Panel Izquierdo - Categorías de Reportes -->
+            <Border Grid.Column="0" 
+                    Background="{DynamicResource SecondaryBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,15,0">
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+
+                        <!-- Reportes Rápidos -->
+                        <TextBlock Text="⚡ Reportes Rápidos" Style="{StaticResource ReportCategoryHeader}"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Content="📋 Resumen General" 
+                                    Style="{StaticResource QuickReportButton}"
+                                    Command="{Binding GenerateSummaryReportCommand}"/>
+                            <Button Content="📊 Dashboard Ejecutivo" 
+                                    Style="{StaticResource QuickReportButton}"
+                                    Command="{Binding GenerateDashboardCommand}"/>
+                            <Button Content="💰 Estado Financiero" 
+                                    Style="{StaticResource QuickReportButton}"
+                                    Command="{Binding GenerateFinancialSummaryCommand}"/>
+                        </StackPanel>
+
+                        <!-- Reportes de Abonados -->
+                        <TextBlock Text="👥 Reportes de Abonados" Style="{StaticResource ReportCategoryHeader}"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Content="📋 Listado Completo de Abonados" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateAbonadosReportCommand}"/>
+                            <Button Content="📊 Estadísticas por Estado" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateEstadisticasEstadoCommand}"/>
+                            <Button Content="🎭 Distribución por Peñas" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateDistribucionPeñasCommand}"/>
+                            <Button Content="🎫 Abonados por Tipo de Abono" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateAbonadosTipoCommand}"/>
+                            <Button Content="👤 Rendimiento por Gestor" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateAbonadosGestorCommand}"/>
+                            <Button Content="📅 Evolución de Altas" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateAltasPeriodoCommand}"/>
+                        </StackPanel>
+
+                        <!-- Reportes Financieros -->
+                        <TextBlock Text="💰 Reportes Financieros" Style="{StaticResource ReportCategoryHeader}"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Content="💵 Análisis de Ingresos" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateIngresosCommand}"/>
+                            <Button Content="📈 Evolución Temporal" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateEvolucionIngresosCommand}"/>
+                            <Button Content="💳 Resumen de Precios" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateResumenPreciosCommand}"/>
+                            <Button Content="📊 Comparativa Anual" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateComparativaCommand}"/>
+                        </StackPanel>
+
+                        <!-- Reportes Administrativos -->
+                        <TextBlock Text="📋 Reportes Administrativos" Style="{StaticResource ReportCategoryHeader}"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <Button Content="📝 Actividad del Sistema" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateActividadCommand}"/>
+                            <Button Content="👥 Análisis de Usuarios" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateUsuariosCommand}"/>
+                            <Button Content="🔄 Historial Consolidado" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding GenerateHistorialCommand}"/>
+                        </StackPanel>
+
+                        <!-- Exportación de Datos -->
+                        <TextBlock Text="📁 Exportación de Datos" Style="{StaticResource ReportCategoryHeader}"/>
+                        <StackPanel>
+                            <Button Content="📋 Exportar Abonados (CSV)" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding ExportAbonadosCommand}"/>
+                            <Button Content="🎫 Exportar Tipos de Abono (CSV)" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding ExportTiposAbonoCommand}"/>
+                            <Button Content="👤 Exportar Gestores (CSV)" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding ExportGestoresCommand}"/>
+                            <Button Content="🎭 Exportar Peñas (CSV)" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding ExportPeñasCommand}"/>
+                            <Button Content="💾 Backup Completo (ZIP)" 
+                                    Style="{StaticResource ReportButton}"
+                                    Command="{Binding ExportCompleteBackupCommand}"/>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Panel Derecho - Vista Previa y Configuración -->
+            <Border Grid.Column="1" 
+                    Background="{DynamicResource BackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <Border Grid.Row="0" 
+                            Background="{DynamicResource SecondaryBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,15">
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" 
+                                       Text="🎯 Configuración de Reportes" 
+                                       FontSize="18" 
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center"/>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="📁 Abrir Carpeta" 
+                                        Style="{StaticResource ModernButton}"
+                                        Command="{Binding OpenReportsFolderCommand}"
+                                        Margin="0,0,10,0"/>
+                                <Button Content="⚙️ Configurar" 
+                                        Style="{StaticResource ModernButton}"
+                                        Command="{Binding ConfigureReportsCommand}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Área de Configuración -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="25">
+
+                            <!-- Filtros de Fecha -->
+                            <GroupBox Header="📅 Filtros Temporales" Margin="0,0,0,20">
+                                <Grid Margin="15">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="20"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.Row="0" Grid.ColumnSpan="3"
+                                              Content="Aplicar filtros de fecha a los reportes" 
+                                              Style="{StaticResource ModernCheckBox}"
+                                              IsChecked="{Binding UsarFiltrosFecha}"
+                                              Margin="0,0,0,15"/>
+
+                                    <StackPanel Grid.Row="1" Grid.Column="0" 
+                                                IsEnabled="{Binding UsarFiltrosFecha}">
+                                        <TextBlock Text="Fecha desde:" Style="{StaticResource ModernTextBlock}"/>
+                                        <DatePicker SelectedDate="{Binding FechaDesde}"
+                                                   Style="{StaticResource ModernDatePicker}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="1" Grid.Column="2" 
+                                                IsEnabled="{Binding UsarFiltrosFecha}">
+                                        <TextBlock Text="Fecha hasta:" Style="{StaticResource ModernTextBlock}"/>
+                                        <DatePicker SelectedDate="{Binding FechaHasta}"
+                                                   Style="{StaticResource ModernDatePicker}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="2" Grid.ColumnSpan="3" 
+                                                Orientation="Horizontal" 
+                                                Margin="0,15,0,0"
+                                                IsEnabled="{Binding UsarFiltrosFecha}">
+                                        <Button Content="Hoy" Style="{StaticResource ModernButton}" 
+                                                Command="{Binding SetFechaHoyCommand}" Margin="0,0,10,0"/>
+                                        <Button Content="Esta Semana" Style="{StaticResource ModernButton}" 
+                                                Command="{Binding SetFechaSemanaCommand}" Margin="0,0,10,0"/>
+                                        <Button Content="Este Mes" Style="{StaticResource ModernButton}" 
+                                                Command="{Binding SetFechaMesCommand}" Margin="0,0,10,0"/>
+                                        <Button Content="Este Año" Style="{StaticResource ModernButton}" 
+                                                Command="{Binding SetFechaAñoCommand}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </GroupBox>
+
+                            <!-- Opciones de Formato -->
+                            <GroupBox Header="📄 Formato de Salida" Margin="0,0,0,20">
+                                <StackPanel Margin="15">
+                                    <TextBlock Text="Formato de archivo:" Style="{StaticResource ModernTextBlock}"/>
+                                    <ComboBox SelectedItem="{Binding FormatoSeleccionado}" 
+                                              Style="{StaticResource ModernComboBox}"
+                                              Margin="0,0,0,15">
+                                        <ComboBoxItem Content="CSV (Excel)" IsSelected="True"/>
+                                        <ComboBoxItem Content="PDF (Portable)"/>
+                                        <ComboBoxItem Content="TXT (Texto plano)"/>
+                                        <ComboBoxItem Content="JSON (Datos estructurados)"/>
+                                    </ComboBox>
+
+                                    <CheckBox Content="Incluir encabezados" 
+                                              Style="{StaticResource ModernCheckBox}"
+                                              IsChecked="{Binding IncluirEncabezados}"
+                                              Margin="0,0,0,5"/>
+                                    <CheckBox Content="Incluir totales y resúmenes" 
+                                              Style="{StaticResource ModernCheckBox}"
+                                              IsChecked="{Binding IncluirTotales}"
+                                              Margin="0,0,0,5"/>
+                                    <CheckBox Content="Abrir automáticamente al generar" 
+                                              Style="{StaticResource ModernCheckBox}"
+                                              IsChecked="{Binding AbrirAutomaticamente}"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- Filtros Adicionales -->
+                            <GroupBox Header="🎯 Filtros Adicionales" Margin="0,0,0,20">
+                                <StackPanel Margin="15">
+
+                                    <TextBlock Text="Estado de abonados:" Style="{StaticResource ModernTextBlock}"/>
+                                    <ComboBox SelectedItem="{Binding EstadoFiltro}" 
+                                              Style="{StaticResource ModernComboBox}"
+                                              Margin="0,0,0,15">
+                                        <ComboBoxItem Content="Todos los estados" IsSelected="True"/>
+                                        <ComboBoxItem Content="Solo activos"/>
+                                        <ComboBoxItem Content="Solo inactivos"/>
+                                        <ComboBoxItem Content="Suspendidos"/>
+                                        <ComboBoxItem Content="Dados de baja"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Peña específica:" Style="{StaticResource ModernTextBlock}"/>
+                                    <ComboBox SelectedItem="{Binding PeñaFiltro}" 
+                                              Style="{StaticResource ModernComboBox}"
+                                              DisplayMemberPath="Nombre"
+                                              SelectedValuePath="Id"
+                                              ItemsSource="{Binding PeñasDisponibles}"
+                                              Margin="0,0,0,15"/>
+
+                                    <TextBlock Text="Gestor específico:" Style="{StaticResource ModernTextBlock}"/>
+                                    <ComboBox SelectedItem="{Binding GestorFiltro}" 
+                                              Style="{StaticResource ModernComboBox}"
+                                              DisplayMemberPath="Nombre"
+                                              SelectedValuePath="Id"
+                                              ItemsSource="{Binding GestoresDisponibles}"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- Vista Previa -->
+                            <GroupBox Header="👁️ Vista Previa" Margin="0,0,0,20">
+                                <Border Margin="15" 
+                                        Background="{DynamicResource TextBoxBackgroundBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        MinHeight="200">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Auto">
+                                        <TextBlock Text="{Binding VistaPrevia}" 
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="15"
+                                                   TextWrapping="Wrap"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </GroupBox>
+
+                            <!-- Estadísticas Actuales -->
+                            <Border Style="{StaticResource InfoBorder}">
+                                <StackPanel>
+                                    <TextBlock Text="📊 Estadísticas Actuales" 
+                                               FontWeight="Bold" 
+                                               Foreground="White"
+                                               Margin="0,0,0,10"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Total Abonados:"/>
+                                                <Run Text="{Binding TotalAbonados}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Abonados Activos:"/>
+                                                <Run Text="{Binding AbonadosActivos}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Total Peñas:"/>
+                                                <Run Text="{Binding TotalPeñas}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Total Gestores:"/>
+                                                <Run Text="{Binding TotalGestores}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Ingresos Estimados:"/>
+                                                <Run Text="{Binding IngresosEstimados}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                            <TextBlock Foreground="White" Margin="0,2">
+                                                <Run Text="Última Actualización:"/>
+                                                <Run Text="{Binding UltimaActualizacion}" FontWeight="Bold"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" 
+                Background="{DynamicResource SecondaryBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0" 
+                Padding="25,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="📁 Reportes guardados en: " 
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MutedBrush}"/>
+                    <TextBlock Text="{Binding RutaReportes}" 
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MutedBrush}"
+                               Margin="0,0,20,0"/>
+
+                    <Button Content="🔄 Actualizar Datos" 
+                            Style="{StaticResource ModernButton}" 
+                            Command="{Binding RefreshDataCommand}"
+                            Margin="0,0,10,0"/>
+
+                    <Button Content="❓ Ayuda" 
+                            Style="{StaticResource InfoButton}"
+                            Command="{Binding ShowHelpCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>

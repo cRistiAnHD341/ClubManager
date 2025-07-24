@@ -14,7 +14,6 @@ using Microsoft.EntityFrameworkCore;
 using ClubManager.Commands;
 using ClubManager.Data;
 using ClubManager.Models;
-using MessageBox = System.Windows.MessageBox;
 
 namespace ClubManager.ViewModels
 {
