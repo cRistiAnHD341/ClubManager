@@ -815,7 +815,8 @@ namespace ClubManager.ViewModels
                     var image = new Image
                     {
                         Source = barcodeImage,
-                        Stretch = Stretch.Fill
+                        Stretch = Stretch.Fill,
+                        Margin = new Thickness(2, 2, 2, elemento.MostrarTexto ? 0 : 2)
                     };
                     stackPanel.Children.Add(image);
                 }
@@ -826,10 +827,11 @@ namespace ClubManager.ViewModels
                     var textBlock = new TextBlock
                     {
                         Text = ObtenerValorCampo(elemento.CampoOrigen),
-                        FontSize = 8,
+                        FontSize = elemento.FontSize,
                         FontFamily = new FontFamily("Courier New"),
+                        Foreground = new SolidColorBrush(elemento.ColorTexto),
                         HorizontalAlignment = HorizontalAlignment.Center,
-                        Margin = new Thickness(0, 2, 0, 0)
+                        Margin = new Thickness(0, 2, 0, 2)
                     };
                     stackPanel.Children.Add(textBlock);
                 }
@@ -853,7 +855,7 @@ namespace ClubManager.ViewModels
 
                 var errorText = new TextBlock
                 {
-                    Text = "Error\nCódigo",
+                    Text = "❌ Error\nCódigo",
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 10,
@@ -984,7 +986,7 @@ namespace ClubManager.ViewModels
             // Generar código de barras válido basado en el número de socio
             var numeroSocio = "12345";
             var año = DateTime.Now.Year.ToString();
-            var codigo = $"{numeroSocio.PadLeft(6, '0')}";
+            var codigo = $"CD{año}{numeroSocio.PadLeft(6, '0')}";
 
             // Agregar dígito verificador simple
             var suma = codigo.Sum(c => char.IsDigit(c) ? int.Parse(c.ToString()) : 0);
@@ -1010,9 +1012,9 @@ namespace ClubManager.ViewModels
             }
 
             // Generar nuevo código basado en datos del abonado
-            var numeroSocio = abonado.CodigoBarras.ToString();
+            var numeroSocio = abonado.NumeroSocio.ToString();
             var año = abonado.FechaCreacion.Year.ToString();
-            var codigo = $"{numeroSocio.PadLeft(6, '0')}";
+            var codigo = $"CD{año}{numeroSocio.PadLeft(6, '0')}";
 
             // Dígito verificador
             var suma = codigo.Sum(c => char.IsDigit(c) ? int.Parse(c.ToString()) : 0);

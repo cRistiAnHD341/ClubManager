@@ -12,6 +12,15 @@
         <!-- Aplicar estilos del archivo proporcionado -->
         <ResourceDictionary>
             <!-- Estilo personalizado para labels como TextBlock -->
+            <Style x:Key="ModernTextBlock" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="0,5"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="HorizontalAlignment" Value="Left"/>
+                <Setter Property="Margin" Value="0,5,0,2"/>
+            </Style>
 
             <!-- Estilo para TextBox editable -->
             <Style x:Key="EditableTextBox" TargetType="TextBox">
@@ -63,6 +72,13 @@
                                VerticalAlignment="Center"
                                Margin="0,0,15,0"
                                FontWeight="SemiBold"/>
+
+                    <!-- Botón de cerrar -->
+                    <Button Content="✖️ Cerrar" 
+                            Style="{StaticResource DangerButton}"
+                            Click="CerrarVentana_Click"
+                            Width="80"
+                            Height="30"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -83,11 +99,11 @@
 
                             <TextBlock Text="Nombre:" Style="{StaticResource ModernTextBlock}"/>
                             <TextBox Text="{Binding PlantillaActual.Nombre, UpdateSourceTrigger=PropertyChanged}" 
-                                     Style="{StaticResource EditableTextBox}"/>
+                                     Style="{StaticResource ModernTextBox}" Padding="0"/>
 
                             <TextBlock Text="Descripción:" Style="{StaticResource ModernTextBlock}"/>
                             <TextBox Text="{Binding PlantillaActual.Descripcion, UpdateSourceTrigger=PropertyChanged}" 
-                                     Style="{StaticResource EditableTextBox}"
+                                     Style="{StaticResource ModernTextBox}" Padding="0"
                                      Height="60" 
                                      TextWrapping="Wrap"
                                      AcceptsReturn="True"
@@ -102,13 +118,13 @@
                                 <StackPanel Grid.Column="0" Margin="0,0,5,0">
                                     <TextBlock Text="Ancho:" Style="{StaticResource ModernTextBlock}"/>
                                     <TextBox Text="{Binding PlantillaActual.Ancho, UpdateSourceTrigger=PropertyChanged}" 
-                                             Style="{StaticResource EditableTextBox}"/>
+                                             Style="{StaticResource ModernTextBox}" Padding="0"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                     <TextBlock Text="Alto:" Style="{StaticResource ModernTextBlock}"/>
                                     <TextBox Text="{Binding PlantillaActual.Alto, UpdateSourceTrigger=PropertyChanged}" 
-                                             Style="{StaticResource EditableTextBox}"/>
+                                             Style="{StaticResource ModernTextBox}" Padding="0"/>
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -122,16 +138,19 @@
                             <Button Content="📝 Agregar Texto" 
                                     Style="{StaticResource ModernButton}"
                                     Command="{Binding AgregarTextoCommand}"
+                                    ToolTip="Agregar un elemento de texto estático"
                                     Margin="0,0,0,5"/>
 
                             <Button Content="🖼️ Agregar Imagen" 
                                     Style="{StaticResource ModernButton}"
                                     Command="{Binding AgregarImagenCommand}"
+                                    ToolTip="Agregar una imagen desde archivo"
                                     Margin="0,0,0,5"/>
 
                             <Button Content="📊 Agregar Código de Barras" 
                                     Style="{StaticResource ModernButton}"
                                     Command="{Binding AgregarCodigoBarrasCommand}"
+                                    ToolTip="Agregar código de barras que se genera automáticamente"
                                     Margin="0,0,0,5"/>
 
                             <Separator Margin="0,10" Background="{DynamicResource BorderBrush}"/>
@@ -145,48 +164,56 @@
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="NombreCompleto"
+                                    ToolTip="Muestra el nombre completo del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="🔢 Número Socio" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="NumeroSocio"
+                                    ToolTip="Muestra el número de socio del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="🆔 DNI" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="DNI"
+                                    ToolTip="Muestra el DNI del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="🏴 Peña" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="Peña"
+                                    ToolTip="Muestra la peña del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="🎫 Tipo Abono" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="TipoAbono"
+                                    ToolTip="Muestra el tipo de abono del socio"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="📞 Teléfono" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="Telefono"
+                                    ToolTip="Muestra el teléfono del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="📧 Email" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="Email"
+                                    ToolTip="Muestra el email del abonado"
                                     Margin="0,0,0,3"/>
 
                             <Button Content="⭐ Estado" 
                                     Style="{StaticResource AccentButton}"
                                     Command="{Binding AgregarCampoCommand}"
                                     CommandParameter="Estado"
+                                    ToolTip="Muestra el estado del abonado (Activo/Inactivo)"
                                     Margin="0,0,0,3"/>
                         </StackPanel>
                     </Border>
@@ -273,40 +300,101 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1,0">
 
-            <ScrollViewer x:Name="CanvasScrollViewer" 
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Auto"
-                          Background="LightGray">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <Grid Background="White" Margin="50">
-                    <!-- Área de la tarjeta -->
-                    <Border x:Name="TarjetaBorder"
-                            Width="{Binding PlantillaActual.Ancho}"
-                            Height="{Binding PlantillaActual.Alto}"
-                            BorderBrush="Black"
-                            BorderThickness="2"
-                            Background="White"
-                            CornerRadius="8"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                        <Border.Effect>
-                            <DropShadowEffect Color="Black" Opacity="0.3" ShadowDepth="5" BlurRadius="10"/>
-                        </Border.Effect>
+                <!-- Barra de herramientas de zoom -->
+                <Border Grid.Row="0" 
+                        Background="{DynamicResource SecondaryBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="10,5">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="🔍➖" 
+                                Style="{StaticResource ModernButton}"
+                                Click="ZoomOut_Click"
+                                ToolTip="Alejar (Ctrl + -)"
+                                Width="45" Height="25"
+                                Margin="0,0,5,0"
+                                Padding="0"/>
 
-                        <!-- Canvas donde se colocan los elementos -->
-                        <Canvas x:Name="CanvasTarjeta" 
-                                Background="Transparent"
-                                AllowDrop="True"
+                        <TextBlock Text="{Binding EstadoActual}" 
+                                   Style="{StaticResource ModernTextBlock}"
+                                   VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   MinWidth="120"
+                                   TextAlignment="Center"
+                                   Margin="5,0"
+                                   Padding="0"/>
+
+                        <Button Content="🔍➕" 
+                                Style="{StaticResource ModernButton}"
+                                Click="ZoomIn_Click"
+                                ToolTip="Acercar (Ctrl + +)"
+                                Width="45" Height="25"
+                                Margin="5,0,5,0"
+                                Padding="0"/>
+
+                        <Button Content="📐" 
+                                Style="{StaticResource AccentButton}"
+                                Click="ZoomFit_Click"
+                                ToolTip="Ajustar a pantalla (Ctrl + 9)"
+                                Width="35" Height="25"
+                                Margin="0,0,5,0"
+                                Padding="0"/>
+
+                        <Button Content="🔄" 
+                                Style="{StaticResource ModernButton}"
+                                Click="ResetearZoom_Click"
+                                ToolTip="Zoom 100% (Ctrl + 0)"
+                                Width="35" Height="25"
+                                Padding="0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ScrollViewer con canvas -->
+                <ScrollViewer x:Name="CanvasScrollViewer" 
+                              Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              Background="LightGray"
+                              PanningMode="Both"
+                              CanContentScroll="True">
+
+                    <Grid Background="White" Margin="50">
+                        <!-- Área de la tarjeta -->
+                        <Border x:Name="TarjetaBorder"
                                 Width="{Binding PlantillaActual.Ancho}"
                                 Height="{Binding PlantillaActual.Alto}"
-                                ClipToBounds="True">
+                                BorderBrush="Black"
+                                BorderThickness="2"
+                                Background="White"
+                                CornerRadius="8"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" Opacity="0.3" ShadowDepth="5" BlurRadius="10"/>
+                            </Border.Effect>
 
-                            <!-- Los elementos se agregan dinámicamente aquí -->
+                            <!-- Canvas donde se colocan los elementos -->
+                            <Canvas x:Name="CanvasTarjeta" 
+                                    Background="Transparent"
+                                    AllowDrop="True"
+                                    Width="{Binding PlantillaActual.Ancho}"
+                                    Height="{Binding PlantillaActual.Alto}"
+                                    ClipToBounds="True"
+                                    Cursor="Hand">
 
-                        </Canvas>
-                    </Border>
-                </Grid>
-            </ScrollViewer>
+                                <!-- Los elementos se agregan dinámicamente aquí -->
+
+                            </Canvas>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
         </Border>
 
         <!-- Panel Derecho - Propiedades -->
@@ -344,7 +432,6 @@
                                       DisplayMemberPath="NombreCompleto"
                                       Style="{StaticResource ModernComboBox}"
                                       Margin="0,0,0,10">
-
                             </ComboBox>
 
                             <Button Content="🔄 Actualizar Lista" 
@@ -395,22 +482,42 @@
                                        TextWrapping="Wrap"
                                        FontSize="12"
                                        Margin="0,0,0,4"/>
+                            <TextBlock Text="• Haz clic en cualquier parte del elemento para seleccionarlo" 
+                                       Foreground="White" 
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Margin="0,0,0,4"/>
                             <TextBlock Text="• Arrastra elementos para moverlos" 
                                        Foreground="White" 
                                        TextWrapping="Wrap"
                                        FontSize="12"
                                        Margin="0,0,0,4"/>
-                            <TextBlock Text="• Selecciona un elemento para ver sus propiedades" 
+                            <TextBlock Text="• Usa las flechas del teclado para mover elementos (Shift+flecha = 10px)" 
                                        Foreground="White" 
                                        TextWrapping="Wrap"
                                        FontSize="12"
                                        Margin="0,0,0,4"/>
-                            <TextBlock Text="• Los campos dinámicos se llenan con datos del abonado" 
+                            <TextBlock Text="• Zoom: Ctrl+Rueda, Ctrl+Plus/Minus, Ctrl+0 (reset), Ctrl+9 (ajustar)" 
                                        Foreground="White" 
                                        TextWrapping="Wrap"
                                        FontSize="12"
                                        Margin="0,0,0,4"/>
-                            <TextBlock Text="• Guarda tu plantilla para reutilizarla" 
+                            <TextBlock Text="• Clic derecho para resetear zoom" 
+                                       Foreground="White" 
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Text="• Las propiedades se actualizan en tiempo real" 
+                                       Foreground="White" 
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Text="• Teclas: Ctrl+S (Guardar), Ctrl+O (Abrir), Del (Eliminar)" 
+                                       Foreground="White" 
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Text="• Los códigos de barras se generan automáticamente del abonado" 
                                        Foreground="White" 
                                        TextWrapping="Wrap"
                                        FontSize="12"/>

@@ -19,6 +19,15 @@ namespace ClubManager.Views
         private Point _lastPosition;
         private UIElement? _draggedElement;
 
+        // NUEVO: Variables para el zoom
+        private double _zoomFactor = 1.0;
+        private const double ZOOM_MIN = 0.1;
+        private const double ZOOM_MAX = 5.0;
+        private const double ZOOM_STEP = 0.1;
+        private ScaleTransform? _scaleTransform;
+        private TranslateTransform? _translateTransform;
+        private TransformGroup? _transformGroup;
+
         public CardDesignerWindow()
         {
             InitializeComponent();
@@ -27,7 +36,135 @@ namespace ClubManager.Views
             _viewModel = new CardDesignerViewModel();
             DataContext = _viewModel;
 
+            // MEJORADO: Agregar teclas de acceso rápido
+            KeyDown += CardDesignerWindow_KeyDown;
+
             Loaded += OnLoaded;
+        }
+
+        private void CardDesignerWindow_KeyDown(object sender, KeyEventArgs e)
+        {
+            try
+            {
+                if (_viewModel == null) return;
+
+                // Teclas de acceso rápido
+                switch (e.Key)
+                {
+                    case Key.Delete:
+                        if (_viewModel.ElementoSeleccionado != null)
+                        {
+                            _viewModel.EliminarElementoCommand.Execute(null);
+                        }
+                        break;
+
+                    case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
+                        _viewModel.GuardarPlantillaCommand.Execute(null);
+                        e.Handled = true;
+                        break;
+
+                    case Key.O when Keyboard.Modifiers == ModifierKeys.Control:
+                        _viewModel.CargarPlantillaCommand.Execute(null);
+                        e.Handled = true;
+                        break;
+
+                    case Key.N when Keyboard.Modifiers == ModifierKeys.Control:
+                        _viewModel.NuevaPlantillaCommand.Execute(null);
+                        e.Handled = true;
+                        break;
+
+                    case Key.Escape:
+                        if (_viewModel.ElementoSeleccionado != null)
+                        {
+                            _viewModel.ElementoSeleccionado = null;
+                        }
+                        break;
+
+                    // Mover elemento seleccionado con flechas
+                    case Key.Left:
+                        MoverElementoSeleccionado(-1, 0);
+                        e.Handled = true;
+                        break;
+                    case Key.Right:
+                        MoverElementoSeleccionado(1, 0);
+                        e.Handled = true;
+                        break;
+                    case Key.Up:
+                        MoverElementoSeleccionado(0, -1);
+                        e.Handled = true;
+                        break;
+                    case Key.Down:
+                        MoverElementoSeleccionado(0, 1);
+                        e.Handled = true;
+                        break;
+
+                    // NUEVO: Controles de zoom con teclado
+                    case Key.Add:
+                    case Key.OemPlus:
+                        if (Keyboard.Modifiers == ModifierKeys.Control)
+                        {
+                            ZoomIn_Click(sender, e);
+                            e.Handled = true;
+                        }
+                        break;
+
+                    case Key.Subtract:
+                    case Key.OemMinus:
+                        if (Keyboard.Modifiers == ModifierKeys.Control)
+                        {
+                            ZoomOut_Click(sender, e);
+                            e.Handled = true;
+                        }
+                        break;
+
+                    case Key.D0:
+                    case Key.NumPad0:
+                        if (Keyboard.Modifiers == ModifierKeys.Control)
+                        {
+                            ResetearZoom();
+                            e.Handled = true;
+                        }
+                        break;
+
+                    case Key.D9:
+                        if (Keyboard.Modifiers == ModifierKeys.Control)
+                        {
+                            ZoomFit_Click(sender, e);
+                            e.Handled = true;
+                        }
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en KeyDown: {ex.Message}");
+            }
+        }
+
+        private void MoverElementoSeleccionado(double deltaX, double deltaY)
+        {
+            try
+            {
+                if (_viewModel?.ElementoSeleccionado == null) return;
+
+                var elemento = _viewModel.ElementoSeleccionado;
+                var incremento = Keyboard.Modifiers == ModifierKeys.Shift ? 10 : 1;
+
+                var newX = Math.Max(0, Math.Min(elemento.X + (deltaX * incremento),
+                    _viewModel.PlantillaActual.Ancho - elemento.Ancho));
+                var newY = Math.Max(0, Math.Min(elemento.Y + (deltaY * incremento),
+                    _viewModel.PlantillaActual.Alto - elemento.Alto));
+
+                elemento.X = newX;
+                elemento.Y = newY;
+
+                ActualizarCanvas();
+                ActualizarPropiedadesEnTiempoReal();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error moviendo elemento: {ex.Message}");
+            }
         }
 
         public CardDesignerWindow(ClubDbContext? dbContext = null) : this()
@@ -72,6 +209,9 @@ namespace ClubManager.Views
                 CanvasTarjeta.MouseLeftButtonUp += Canvas_MouseLeftButtonUp;
                 CanvasTarjeta.MouseLeave += Canvas_MouseLeave;
 
+                // NUEVO: Configurar zoom
+                ConfigurarZoom();
+
                 // Actualizar propiedades inicialmente
                 System.Diagnostics.Debug.WriteLine("Actualizando panel de propiedades...");
                 ActualizarPanelPropiedades();
@@ -107,27 +247,52 @@ namespace ClubManager.Views
                 var canvas = sender as Canvas;
                 if (canvas == null) return;
 
+                // MEJORADO: Considerar zoom en la posición del mouse
                 _lastPosition = e.GetPosition(canvas);
-                var hitElement = canvas.InputHitTest(_lastPosition) as UIElement;
 
-                if (hitElement != null && hitElement != canvas)
+                // Buscar elemento por posición del mouse directamente
+                var elementoEncontrado = EncontrarElementoPorPosicion(_lastPosition);
+
+                if (elementoEncontrado != null && _viewModel != null)
                 {
-                    // Encontrar el elemento de tarjeta correspondiente
-                    var elementoTarjeta = EncontrarElementoPorUI(hitElement);
-                    if (elementoTarjeta != null && _viewModel != null)
+                    _viewModel.ElementoSeleccionado = elementoEncontrado;
+
+                    // Buscar el UIElement correspondiente para el arrastre
+                    _draggedElement = EncontrarUIElementoPorElemento(elementoEncontrado);
+
+                    if (_draggedElement != null)
                     {
-                        _viewModel.ElementoSeleccionado = elementoTarjeta;
-                        _draggedElement = hitElement;
                         _isDragging = true;
                         canvas.CaptureMouse();
+
+                        // Hacer que el elemento seleccionado esté en primer plano durante el arrastre
+                        Panel.SetZIndex(_draggedElement, 9999);
                     }
                 }
                 else
                 {
-                    // Click en área vacía - deseleccionar
-                    if (_viewModel != null)
+                    // Si no se encuentra elemento, intentar con HitTest como respaldo
+                    var hitElement = canvas.InputHitTest(_lastPosition) as UIElement;
+
+                    if (hitElement != null && hitElement != canvas)
                     {
-                        _viewModel.ElementoSeleccionado = null;
+                        var elementoTarjeta = EncontrarElementoPorUI(hitElement);
+                        if (elementoTarjeta != null && _viewModel != null)
+                        {
+                            _viewModel.ElementoSeleccionado = elementoTarjeta;
+                            _draggedElement = hitElement;
+                            _isDragging = true;
+                            canvas.CaptureMouse();
+                            Panel.SetZIndex(_draggedElement, 9999);
+                        }
+                    }
+                    else
+                    {
+                        // Click en área vacía - deseleccionar
+                        if (_viewModel != null)
+                        {
+                            _viewModel.ElementoSeleccionado = null;
+                        }
                     }
                 }
             }
@@ -165,13 +330,55 @@ namespace ClubManager.Views
 
                 _lastPosition = currentPosition;
 
-                // Actualizar propiedades
-                ActualizarPanelPropiedades();
+                // MEJORADO: Actualizar propiedades en tiempo real durante el arrastre
+                ActualizarPropiedadesEnTiempoReal();
+
+                // También actualizar el borde de selección
+                ResaltarElementoSeleccionado();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error en MouseMove: {ex.Message}");
             }
+        }
+
+        private void ActualizarPropiedadesEnTiempoReal()
+        {
+            try
+            {
+                if (_viewModel?.ElementoSeleccionado == null) return;
+
+                // Buscar y actualizar solo los TextBox de posición sin recrear todo el panel
+                foreach (UIElement child in PropiedadesPanel.Children)
+                {
+                    if (child is TextBox textBox)
+                    {
+                        var previousChild = GetPreviousChild(textBox);
+                        if (previousChild is TextBlock label)
+                        {
+                            switch (label.Text)
+                            {
+                                case "Posición X:":
+                                    textBox.Text = _viewModel.ElementoSeleccionado.X.ToString("F0");
+                                    break;
+                                case "Posición Y:":
+                                    textBox.Text = _viewModel.ElementoSeleccionado.Y.ToString("F0");
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error actualizando propiedades en tiempo real: {ex.Message}");
+            }
+        }
+
+        private UIElement? GetPreviousChild(UIElement element)
+        {
+            var index = PropiedadesPanel.Children.IndexOf(element);
+            return index > 0 ? PropiedadesPanel.Children[index - 1] : null;
         }
 
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -184,8 +391,18 @@ namespace ClubManager.Views
                 if (_isDragging)
                 {
                     _isDragging = false;
+
+                    // MEJORADO: Restaurar Z-Index original
+                    if (_draggedElement != null && _viewModel?.ElementoSeleccionado != null)
+                    {
+                        Panel.SetZIndex(_draggedElement, _viewModel.ElementoSeleccionado.ZIndex);
+                    }
+
                     _draggedElement = null;
                     canvas.ReleaseMouseCapture();
+
+                    // Actualizar propiedades después del arrastre
+                    ActualizarPanelPropiedades();
                 }
             }
             catch (Exception ex)
@@ -201,15 +418,194 @@ namespace ClubManager.Views
                 if (_isDragging)
                 {
                     _isDragging = false;
+
+                    // MEJORADO: Restaurar Z-Index original
+                    if (_draggedElement != null && _viewModel?.ElementoSeleccionado != null)
+                    {
+                        Panel.SetZIndex(_draggedElement, _viewModel.ElementoSeleccionado.ZIndex);
+                    }
+
                     _draggedElement = null;
 
                     var canvas = sender as Canvas;
                     canvas?.ReleaseMouseCapture();
+
+                    // Actualizar propiedades después del arrastre
+                    ActualizarPanelPropiedades();
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error en MouseLeave: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Funcionalidad de Zoom
+
+        private void ConfigurarZoom()
+        {
+            try
+            {
+                // Configurar transformaciones
+                _scaleTransform = new ScaleTransform(1.0, 1.0);
+                _translateTransform = new TranslateTransform();
+
+                _transformGroup = new TransformGroup();
+                _transformGroup.Children.Add(_scaleTransform);
+                _transformGroup.Children.Add(_translateTransform);
+
+                // Aplicar transformación al borde de la tarjeta
+                TarjetaBorder.RenderTransform = _transformGroup;
+                TarjetaBorder.RenderTransformOrigin = new Point(0.5, 0.5);
+
+                // Configurar eventos de zoom
+                CanvasScrollViewer.MouseWheel += Canvas_MouseWheel;
+                CanvasScrollViewer.PreviewMouseRightButtonDown += Canvas_PreviewMouseRightButtonDown;
+
+                System.Diagnostics.Debug.WriteLine("Zoom configurado correctamente");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error configurando zoom: {ex.Message}");
+            }
+        }
+
+        private void Canvas_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            try
+            {
+                if (Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    // Zoom con Ctrl + rueda del mouse
+                    var delta = e.Delta > 0 ? ZOOM_STEP : -ZOOM_STEP;
+                    AplicarZoom(delta, e.GetPosition(CanvasScrollViewer));
+                    e.Handled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en MouseWheel: {ex.Message}");
+            }
+        }
+
+        private void Canvas_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                // Click derecho para resetear zoom
+                ResetearZoom();
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en clic derecho: {ex.Message}");
+            }
+        }
+
+        private void AplicarZoom(double delta, Point mousePosition)
+        {
+            try
+            {
+                var nuevoZoom = Math.Max(ZOOM_MIN, Math.Min(ZOOM_MAX, _zoomFactor + delta));
+
+                if (Math.Abs(nuevoZoom - _zoomFactor) < 0.01) return;
+
+                // Calcular el punto de zoom relativo al centro de la tarjeta
+                var tarjetaCenter = new Point(
+                    TarjetaBorder.ActualWidth / 2,
+                    TarjetaBorder.ActualHeight / 2);
+
+                // Aplicar la nueva escala
+                _scaleTransform!.ScaleX = nuevoZoom;
+                _scaleTransform.ScaleY = nuevoZoom;
+
+                _zoomFactor = nuevoZoom;
+
+                // Actualizar la información de zoom si hay un label en la interfaz
+                ActualizarInfoZoom();
+
+                System.Diagnostics.Debug.WriteLine($"Zoom aplicado: {_zoomFactor:P0}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error aplicando zoom: {ex.Message}");
+            }
+        }
+
+        private void ResetearZoom()
+        {
+            try
+            {
+                _zoomFactor = 1.0;
+                _scaleTransform!.ScaleX = 1.0;
+                _scaleTransform.ScaleY = 1.0;
+                _translateTransform!.X = 0;
+                _translateTransform.Y = 0;
+
+                ActualizarInfoZoom();
+
+                System.Diagnostics.Debug.WriteLine("Zoom reseteado");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error reseteando zoom: {ex.Message}");
+            }
+        }
+
+        private void ZoomIn_Click(object sender, RoutedEventArgs e)
+        {
+            AplicarZoom(ZOOM_STEP, new Point(CanvasScrollViewer.ActualWidth / 2, CanvasScrollViewer.ActualHeight / 2));
+        }
+
+        private void ZoomOut_Click(object sender, RoutedEventArgs e)
+        {
+            AplicarZoom(-ZOOM_STEP, new Point(CanvasScrollViewer.ActualWidth / 2, CanvasScrollViewer.ActualHeight / 2));
+        }
+
+        private void ZoomFit_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Calcular el zoom para que la tarjeta quepa en el visor
+                var scaleX = CanvasScrollViewer.ActualWidth / (TarjetaBorder.ActualWidth + 100);
+                var scaleY = CanvasScrollViewer.ActualHeight / (TarjetaBorder.ActualHeight + 100);
+                var scale = Math.Min(scaleX, scaleY);
+
+                scale = Math.Max(ZOOM_MIN, Math.Min(ZOOM_MAX, scale));
+
+                _zoomFactor = scale;
+                _scaleTransform!.ScaleX = scale;
+                _scaleTransform.ScaleY = scale;
+                _translateTransform!.X = 0;
+                _translateTransform.Y = 0;
+
+                ActualizarInfoZoom();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en zoom fit: {ex.Message}");
+            }
+        }
+
+        private void ResetearZoom_Click(object sender, RoutedEventArgs e)
+        {
+            ResetearZoom();
+        }
+
+        private void ActualizarInfoZoom()
+        {
+            try
+            {
+                if (_viewModel != null)
+                {
+                    _viewModel.EstadoActual = $"Zoom: {_zoomFactor:P0} - Listo para diseñar";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error actualizando info de zoom: {ex.Message}");
             }
         }
 
@@ -223,13 +619,84 @@ namespace ClubManager.Views
             {
                 if (_viewModel?.ElementosActuales == null) return null;
 
-                // Buscar por posición en el canvas
+                // MEJORADO: Buscar por el UIElement directamente y por posición
+
+                // Primero intentar buscar por referencia directa del UIElement
+                foreach (var elemento in _viewModel.ElementosActuales)
+                {
+                    var elementoUI = EncontrarUIElementoPorElemento(elemento);
+                    if (elementoUI == uiElement || EsHijoDe(uiElement, elementoUI))
+                    {
+                        return elemento;
+                    }
+                }
+
+                // Si no se encuentra, buscar por posición (método de respaldo)
                 var left = Canvas.GetLeft(uiElement);
                 var top = Canvas.GetTop(uiElement);
 
-                foreach (var elemento in _viewModel.ElementosActuales)
+                if (!double.IsNaN(left) && !double.IsNaN(top))
                 {
-                    if (Math.Abs(elemento.X - left) < 1 && Math.Abs(elemento.Y - top) < 1)
+                    foreach (var elemento in _viewModel.ElementosActuales)
+                    {
+                        if (Math.Abs(elemento.X - left) < 1 && Math.Abs(elemento.Y - top) < 1)
+                        {
+                            return elemento;
+                        }
+                    }
+                }
+
+                // Último intento: buscar por posición del mouse en el canvas
+                return EncontrarElementoPorPosicion(Mouse.GetPosition(CanvasTarjeta));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private UIElement? EncontrarUIElementoPorElemento(ElementoTarjeta elemento)
+        {
+            foreach (UIElement child in CanvasTarjeta.Children)
+            {
+                if (child.GetValue(NameProperty) != null && child.GetValue(NameProperty).ToString() == "SelectionBorder")
+                    continue;
+
+                var left = Canvas.GetLeft(child);
+                var top = Canvas.GetTop(child);
+
+                if (Math.Abs(elemento.X - left) < 1 && Math.Abs(elemento.Y - top) < 1)
+                {
+                    return child;
+                }
+            }
+            return null;
+        }
+
+        private bool EsHijoDe(UIElement hijo, UIElement? padre)
+        {
+            if (padre == null) return false;
+
+            var current = hijo;
+            while (current != null)
+            {
+                if (current == padre) return true;
+                current = VisualTreeHelper.GetParent(current) as UIElement;
+            }
+            return false;
+        }
+
+        private ElementoTarjeta? EncontrarElementoPorPosicion(Point posicion)
+        {
+            try
+            {
+                if (_viewModel?.ElementosActuales == null) return null;
+
+                // Buscar el elemento que contiene la posición del mouse
+                foreach (var elemento in _viewModel.ElementosActuales.OrderByDescending(e => e.ZIndex))
+                {
+                    if (posicion.X >= elemento.X && posicion.X <= elemento.X + elemento.Ancho &&
+                        posicion.Y >= elemento.Y && posicion.Y <= elemento.Y + elemento.Alto)
                     {
                         return elemento;
                     }
@@ -417,6 +884,23 @@ namespace ClubManager.Views
                 Style = (Style)FindResource("EditableTextBox")
             };
 
+            // MEJORADO: Actualización en tiempo real mientras se escribe
+            textBox.TextChanged += (s, e) =>
+            {
+                try
+                {
+                    if (double.TryParse(textBox.Text, out double nuevoValor))
+                    {
+                        onChange(nuevoValor);
+                        // Actualizar inmediatamente sin esperar a LostFocus
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores durante la escritura
+                }
+            };
+
             textBox.LostFocus += (s, e) =>
             {
                 try
@@ -454,6 +938,19 @@ namespace ClubManager.Views
             {
                 Text = valor,
                 Style = (Style)FindResource("EditableTextBox")
+            };
+
+            // MEJORADO: Actualización en tiempo real
+            textBox.TextChanged += (s, e) =>
+            {
+                try
+                {
+                    onChange(textBox.Text);
+                }
+                catch
+                {
+                    // Ignorar errores durante la escritura
+                }
             };
 
             textBox.LostFocus += (s, e) =>
@@ -802,6 +1299,42 @@ namespace ClubManager.Views
             {
                 MessageBox.Show($"Error al cambiar imagen: {ex.Message}", "Error",
                               MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        #endregion
+
+        #region Eventos de la Ventana
+
+        private void CerrarVentana_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Preguntar si quiere guardar antes de cerrar
+                if (_viewModel?.ElementosActuales.Count > 0)
+                {
+                    var result = MessageBox.Show(
+                        "¿Desea guardar la plantilla antes de cerrar?",
+                        "Guardar cambios",
+                        MessageBoxButton.YesNoCancel,
+                        MessageBoxImage.Question);
+
+                    switch (result)
+                    {
+                        case MessageBoxResult.Yes:
+                            _viewModel.GuardarPlantillaCommand.Execute(null);
+                            break;
+                        case MessageBoxResult.Cancel:
+                            return; // No cerrar
+                    }
+                }
+
+                Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error al cerrar ventana: {ex.Message}");
+                Close(); // Cerrar de todas formas
             }
         }
 

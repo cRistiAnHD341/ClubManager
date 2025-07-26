@@ -44,3 +44,4 @@ global using Path = System.IO.Path;
 global using ComboBox = System.Windows.Controls.ComboBox;
 global using CheckBox = System.Windows.Controls.CheckBox;
 global using Button = System.Windows.Controls.Button;
+global using Panel = System.Windows.Controls.Panel;
