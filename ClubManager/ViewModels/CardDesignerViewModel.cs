@@ -331,7 +331,48 @@ namespace ClubManager.ViewModels
             {
                 var valorCodigo = ObtenerValorCampo(elemento.CampoOrigen);
 
-                // Crear contenedor SIN borde
+                // VALIDACIÓN Y PREPARACIÓN DE DATOS PARA MÁXIMA CALIDAD
+                string codigoLimpio = valorCodigo;
+
+                // Preparar el código según el tipo para máxima compatibilidad
+                switch (elemento.TipoCodigo.ToUpper())
+                {
+                    case "CODE128":
+                        codigoLimpio = BarcodeGenerator.PrepareForCode128(valorCodigo);
+                        if (!BarcodeGenerator.ValidateCode128(codigoLimpio))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"ADVERTENCIA: Código inválido para Code128: '{valorCodigo}' -> '{codigoLimpio}'");
+                        }
+                        break;
+
+                    case "CODE39":
+                        // Code39 solo acepta A-Z, 0-9, y algunos símbolos especiales
+                        codigoLimpio = new string(valorCodigo.ToUpper()
+                            .Where(c => char.IsLetterOrDigit(c) || "-. $/%+*".Contains(c))
+                            .ToArray());
+                        break;
+
+                    case "EAN13":
+                        // EAN13 requiere exactamente 13 dígitos
+                        codigoLimpio = new string(valorCodigo.Where(char.IsDigit).ToArray());
+                        if (codigoLimpio.Length < 13)
+                        {
+                            codigoLimpio = codigoLimpio.PadLeft(13, '0');
+                        }
+                        else if (codigoLimpio.Length > 13)
+                        {
+                            codigoLimpio = codigoLimpio.Substring(codigoLimpio.Length - 13);
+                        }
+                        break;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Generando código {elemento.TipoCodigo}: '{valorCodigo}' -> '{codigoLimpio}'");
+
+                // Obtener información del código para debug
+                var infoBarcode = BarcodeGenerator.GetBarcodeInfo(codigoLimpio, elemento.TipoCodigo);
+                System.Diagnostics.Debug.WriteLine(infoBarcode);
+
+                // Crear contenedor principal SIN borde para máxima nitidez
                 var container = new StackPanel
                 {
                     Width = elemento.Ancho,
@@ -339,68 +380,286 @@ namespace ClubManager.ViewModels
                     Orientation = Orientation.Vertical,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Background = new SolidColorBrush(elemento.ColorFondo)
+                    Background = new SolidColorBrush(elemento.ColorFondo),
+                    ClipToBounds = true // Importante para mantener la precisión
                 };
 
-                // Generar código de barras con el formato correcto
+                // GENERACIÓN DE CÓDIGO DE BARRAS CON MÁXIMA CALIDAD
                 BitmapSource? barcodeImage = null;
-                var alturaBarras = elemento.MostrarTexto ? elemento.Alto - 15 : elemento.Alto;
+                var alturaBarras = elemento.MostrarTexto ? elemento.Alto - 20 : elemento.Alto; // Más espacio para texto
+
+                // Asegurar dimensiones mínimas para calidad óptima
+                var anchoOptimo = Math.Max(elemento.Ancho, 200); // Mínimo 200px de ancho
+                var altoOptimo = Math.Max(alturaBarras, 40);     // Mínimo 40px de alto
 
                 switch (elemento.TipoCodigo.ToUpper())
                 {
                     case "CODE128":
-                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code128");
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(codigoLimpio, anchoOptimo, altoOptimo, "Code128");
                         break;
                     case "CODE39":
-                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code39");
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(codigoLimpio, anchoOptimo, altoOptimo, "Code39");
                         break;
                     case "EAN13":
-                        var ean13Value = GenerarEAN13(valorCodigo);
-                        barcodeImage = BarcodeGenerator.GenerateBarcode(ean13Value, elemento.Ancho, alturaBarras, "EAN13");
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(codigoLimpio, anchoOptimo, altoOptimo, "EAN13");
                         break;
                     case "QRCODE":
-                        barcodeImage = BarcodeGenerator.GenerateQRCode(valorCodigo, Math.Min(elemento.Ancho, elemento.Alto));
+                        var tamaño = Math.Min(elemento.Ancho, elemento.Alto);
+                        barcodeImage = BarcodeGenerator.GenerateQRCode(codigoLimpio, Math.Max(tamaño, 100));
                         break;
                     default:
-                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code128");
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(codigoLimpio, anchoOptimo, altoOptimo, "Code128");
                         break;
                 }
 
-                // Agregar imagen del código de barras
-                if (barcodeImage != null)
+                // Verificar que se generó correctamente
+                if (barcodeImage == null)
                 {
-                    var image = new Image
-                    {
-                        Source = barcodeImage,
-                        Stretch = Stretch.Fill,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    };
-
-                    container.Children.Add(image);
+                    System.Diagnostics.Debug.WriteLine($"ERROR: No se pudo generar el código de barras para '{codigoLimpio}'");
+                    return CrearElementoError(elemento, $"Error generando {elemento.TipoCodigo}");
                 }
 
-                // Agregar texto si está habilitado
+                // IMAGEN CON CONFIGURACIÓN DE ALTA CALIDAD
+                var image = new Image
+                {
+                    Source = barcodeImage,
+                    Stretch = Stretch.Uniform, // Cambiar a Uniform para mantener proporciones exactas
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    // Configuraciones para máxima nitidez
+                    SnapsToDevicePixels = true,
+                    UseLayoutRounding = true
+                };
+
+                // Aplicar RenderOptions para máxima calidad
+                RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.NearestNeighbor); // Sin suavizado
+                RenderOptions.SetEdgeMode(image, EdgeMode.Aliased); // Bordes nítidos
+
+                container.Children.Add(image);
+
+                // TEXTO CON MÁXIMA LEGIBILIDAD
                 if (elemento.MostrarTexto)
                 {
                     var textBlock = new TextBlock
                     {
-                        Text = valorCodigo,
-                        FontSize = elemento.FontSize,
-                        FontFamily = new FontFamily("Courier New"),
+                        Text = codigoLimpio, // Usar el código limpio, no el original
+                        FontSize = Math.Max(elemento.FontSize, 8), // Tamaño mínimo legible
+                        FontFamily = new FontFamily("Courier New"), // Fuente monoespaciada
+                        FontWeight = FontWeights.Normal,
                         Foreground = new SolidColorBrush(elemento.ColorTexto),
                         HorizontalAlignment = HorizontalAlignment.Center,
                         TextAlignment = TextAlignment.Center,
-                        Margin = new Thickness(0, 2, 0, 0)
+                        Margin = new Thickness(0, 2, 0, 0),
+                        // Configuraciones para máxima nitidez del texto
+                        SnapsToDevicePixels = true,
+                        UseLayoutRounding = true
                     };
+
+                    // Aplicar configuraciones de renderizado de alta calidad para el texto
+                    TextOptions.SetTextFormattingMode(textBlock, TextFormattingMode.Display);
+                    TextOptions.SetTextRenderingMode(textBlock, TextRenderingMode.ClearType);
+
                     container.Children.Add(textBlock);
                 }
+
+                System.Diagnostics.Debug.WriteLine($"Código de barras {elemento.TipoCodigo} creado con MÁXIMA CALIDAD: {elemento.Ancho}x{elemento.Alto}");
 
                 return container;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error creando código de barras: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error creando código de barras de alta calidad: {ex.Message}");
                 return CrearElementoError(elemento, $"Error: {elemento.TipoCodigo}");
+            }
+        }
+
+        private string ObtenerValorCampoParaBarcode(string campo, string tipoCodigo)
+        {
+            try
+            {
+                var valor = ObtenerValorCampo(campo);
+
+                // Validar y ajustar según el tipo de código
+                switch (tipoCodigo.ToUpper())
+                {
+                    case "CODE128":
+                        // Code128 acepta la mayoría de caracteres ASCII
+                        return valor;
+
+                    case "CODE39":
+                        // Code39 solo acepta: A-Z, 0-9, y los símbolos: - . $ / % + space *
+                        var validChars = valor.ToUpper().Where(c =>
+                            char.IsLetterOrDigit(c) ||
+                            "-. $/%+*".Contains(c)).ToArray();
+                        return new string(validChars);
+
+                    case "EAN13":
+                        // EAN13 solo acepta números
+                        var numeros = valor.Where(char.IsDigit).ToArray();
+                        var numeroString = new string(numeros);
+
+                        if (numeroString.Length < 13)
+                        {
+                            // Usar el número de socio como base si es muy corto
+                            var numeroSocio = AbonadoEjemplo?.NumeroSocio ?? 12345;
+                            numeroString = numeroSocio.ToString().PadLeft(12, '0') + "0";
+                        }
+
+                        return numeroString.Length > 13 ?
+                            numeroString.Substring(numeroString.Length - 13) :
+                            numeroString.PadLeft(13, '0');
+
+                    case "QRCODE":
+                        // QR acepta cualquier texto
+                        return valor;
+
+                    default:
+                        return valor;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error obteniendo valor para barcode: {ex.Message}");
+                return "ERROR";
+            }
+        }
+
+
+        private bool ValidarCodigoBarras(ElementoCodigoBarras elemento)
+        {
+            try
+            {
+                var valor = ObtenerValorCampoParaBarcode(elemento.CampoOrigen, elemento.TipoCodigo);
+
+                if (string.IsNullOrWhiteSpace(valor))
+                {
+                    System.Diagnostics.Debug.WriteLine($"Valor vacío para código de barras: {elemento.CampoOrigen}");
+                    return false;
+                }
+
+                switch (elemento.TipoCodigo.ToUpper())
+                {
+                    case "CODE128":
+                        return BarcodeGenerator.ValidateCode128(valor);
+
+                    case "CODE39":
+                        // Verificar que solo contiene caracteres válidos para Code39
+                        return valor.All(c => char.IsLetterOrDigit(c) || "-. $/%+*".Contains(c));
+
+                    case "EAN13":
+                        // Verificar que tiene exactamente 13 dígitos
+                        return valor.Length == 13 && valor.All(char.IsDigit);
+
+                    case "QRCODE":
+                        // QR acepta cualquier texto no vacío
+                        return !string.IsNullOrWhiteSpace(valor);
+
+                    default:
+                        return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Método mejorado para agregar código de barras con validación
+        /// </summary>
+        private void AgregarCodigoBarrasConValidacion()
+        {
+            try
+            {
+                var nuevoCodigo = new ElementoCodigoBarras
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Tipo = "Código de Barras",
+                    X = 50,
+                    Y = 150,
+                    Ancho = 250, // Ancho mínimo aumentado para mejor calidad
+                    Alto = 80,   // Alto aumentado para mejor legibilidad
+                    ZIndex = ElementosActuales.Count + 1,
+                    TipoCodigo = "Code128",
+                    CampoOrigen = "CodigoBarras",
+                    MostrarTexto = true,
+                    FontFamily = "Courier New",
+                    FontSize = 10, // Tamaño aumentado para mejor legibilidad
+                    ColorTexto = Colors.Black,
+                    ColorFondo = Colors.White
+                };
+
+                // Validar el código antes de agregarlo
+                if (ValidarCodigoBarras(nuevoCodigo))
+                {
+                    ElementosActuales.Add(nuevoCodigo);
+                    ActualizarCanvas();
+                    ElementoSeleccionado = nuevoCodigo;
+                    EstadoActual = "Código de barras de alta calidad agregado";
+
+                    // Mostrar información del código generado
+                    var valor = ObtenerValorCampoParaBarcode(nuevoCodigo.CampoOrigen, nuevoCodigo.TipoCodigo);
+                    var info = BarcodeGenerator.GetBarcodeInfo(valor, nuevoCodigo.TipoCodigo);
+                    System.Diagnostics.Debug.WriteLine($"Código de barras agregado:\n{info}");
+                }
+                else
+                {
+                    EstadoActual = "Error: No se puede generar código de barras válido";
+                    MessageBox.Show("No se puede generar un código de barras válido con los datos actuales.",
+                                  "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                System.Diagnostics.Debug.WriteLine("Código de barras de alta calidad agregado");
+            }
+            catch (Exception ex)
+            {
+                MostrarError("Error agregando código de barras", ex);
+            }
+        }
+
+        /// <summary>
+        /// Método para testear la calidad de códigos de barras
+        /// </summary>
+        public void TestearCalidadCodigoBarras()
+        {
+            try
+            {
+                var testData = "CM52759393JSRVUM"; // Tu ejemplo específico
+
+                System.Diagnostics.Debug.WriteLine("=== PRUEBA DE CALIDAD DE CÓDIGO DE BARRAS ===");
+
+                // Probar Code128
+                var esValido = BarcodeGenerator.ValidateCode128(testData);
+                System.Diagnostics.Debug.WriteLine($"¿Es válido '{testData}' para Code128? {esValido}");
+
+                if (!esValido)
+                {
+                    var dataLimpia = BarcodeGenerator.PrepareForCode128(testData);
+                    System.Diagnostics.Debug.WriteLine($"Datos limpiados: '{dataLimpia}'");
+                    esValido = BarcodeGenerator.ValidateCode128(dataLimpia);
+                    System.Diagnostics.Debug.WriteLine($"¿Es válido después de limpiar? {esValido}");
+                }
+
+                // Obtener información detallada
+                var info = BarcodeGenerator.GetBarcodeInfo(testData, "Code128");
+                System.Diagnostics.Debug.WriteLine(info);
+
+                // Generar imagen de prueba
+                var imagen = BarcodeGenerator.GenerateBarcode(testData, 300, 80, "Code128");
+                if (imagen != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Imagen generada exitosamente: {imagen.Width}x{imagen.Height} píxeles");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("ERROR: No se pudo generar la imagen");
+                }
+
+                System.Diagnostics.Debug.WriteLine("=== FIN DE PRUEBA ===");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en prueba: {ex.Message}");
             }
         }
 
@@ -695,37 +954,7 @@ namespace ClubManager.ViewModels
 
         private void AgregarCodigoBarras()
         {
-            try
-            {
-                var nuevoCodigo = new ElementoCodigoBarras
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Tipo = "Código de Barras",
-                    X = 50,
-                    Y = 150,
-                    Ancho = 200,
-                    Alto = 60,
-                    ZIndex = ElementosActuales.Count + 1,
-                    TipoCodigo = "Code128",
-                    CampoOrigen = "CodigoBarras",
-                    MostrarTexto = true,
-                    FontFamily = "Courier New",
-                    FontSize = 8,
-                    ColorTexto = Colors.Black,
-                    ColorFondo = Colors.White
-                };
-
-                ElementosActuales.Add(nuevoCodigo);
-                ActualizarCanvas();
-                ElementoSeleccionado = nuevoCodigo;
-                EstadoActual = "Código de barras agregado";
-
-                System.Diagnostics.Debug.WriteLine("Código de barras agregado");
-            }
-            catch (Exception ex)
-            {
-                MostrarError("Error agregando código de barras", ex);
-            }
+            AgregarCodigoBarrasConValidacion();
         }
 
         private void AgregarCampo(string? tipoCampo)
