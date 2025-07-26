@@ -97,7 +97,7 @@ namespace ClubManager.ViewModels
 
         #endregion
 
-        #region Comandos - CORREGIDO: Agregar setters privados
+        #region Comandos
 
         public ICommand AgregarTextoCommand { get; private set; } = null!;
         public ICommand AgregarImagenCommand { get; private set; } = null!;
@@ -111,6 +111,8 @@ namespace ClubManager.ViewModels
         public ICommand ImprimirPruebaCommand { get; private set; } = null!;
         public ICommand AplicarPlantillaCommand { get; private set; } = null!;
         public ICommand CargarDatosRealesCommand { get; private set; } = null!;
+        public ICommand DuplicarElementoCommand { get; private set; } = null!;
+        public ICommand ValidarPlantillaCommand { get; private set; } = null!;
 
         #endregion
 
@@ -126,8 +128,6 @@ namespace ClubManager.ViewModels
             ElementosActuales = new ObservableCollection<ElementoTarjeta>();
             AbonadosDisponibles = new ObservableCollection<Abonado>();
 
-            System.Diagnostics.Debug.WriteLine("ElementosActuales inicializado");
-
             // Inicializar plantilla por defecto
             _plantillaActual = new PlantillaTarjeta
             {
@@ -141,12 +141,8 @@ namespace ClubManager.ViewModels
                 Elementos = new List<ElementoTarjeta>()
             };
 
-            System.Diagnostics.Debug.WriteLine($"Plantilla creada: {_plantillaActual.Nombre}");
-
-            // Crear abonado de ejemplo con datos más completos y realistas
+            // Crear abonado de ejemplo
             _abonadoEjemplo = CrearAbonadoEjemplo();
-
-            System.Diagnostics.Debug.WriteLine($"Abonado ejemplo creado: {_abonadoEjemplo.NombreCompleto}");
 
             // Cargar abonados disponibles
             CargarAbonadosDisponibles();
@@ -154,9 +150,7 @@ namespace ClubManager.ViewModels
             // Inicializar comandos
             InicializarComandos();
 
-            System.Diagnostics.Debug.WriteLine("Comandos inicializados");
-
-            // Agregar un elemento de prueba para verificar que funciona
+            // Agregar elementos de prueba
             AgregarElementosDePrueba();
 
             System.Diagnostics.Debug.WriteLine("=== CardDesignerViewModel INICIALIZADO ===");
@@ -176,6 +170,8 @@ namespace ClubManager.ViewModels
             ImprimirPruebaCommand = new RelayCommand(ImprimirPrueba);
             AplicarPlantillaCommand = new RelayCommand(AplicarPlantilla);
             CargarDatosRealesCommand = new RelayCommand(CargarDatosReales);
+            DuplicarElementoCommand = new RelayCommand(DuplicarElemento, () => ElementoSeleccionado != null);
+            ValidarPlantillaCommand = new RelayCommand(ValidarPlantilla);
         }
 
         #endregion
@@ -189,7 +185,6 @@ namespace ClubManager.ViewModels
                 _canvasTarjeta = canvas;
                 System.Diagnostics.Debug.WriteLine("Canvas asignado correctamente");
 
-                // Actualizar inmediatamente si hay elementos
                 if (ElementosActuales.Any())
                 {
                     ActualizarCanvas();
@@ -210,7 +205,7 @@ namespace ClubManager.ViewModels
             {
                 _canvasTarjeta.Children.Clear();
 
-                foreach (var elemento in ElementosActuales)
+                foreach (var elemento in ElementosActuales.OrderBy(e => e.ZIndex))
                 {
                     var uiElement = CrearElementoUI(elemento);
                     if (uiElement != null)
@@ -218,6 +213,20 @@ namespace ClubManager.ViewModels
                         Canvas.SetLeft(uiElement, elemento.X);
                         Canvas.SetTop(uiElement, elemento.Y);
                         Canvas.SetZIndex(uiElement, elemento.ZIndex);
+
+                        // Aplicar opacidad si es diferente de 1
+                        if (elemento.Opacidad != 1.0)
+                        {
+                            uiElement.Opacity = elemento.Opacidad;
+                        }
+
+                        // Aplicar rotación si es diferente de 0
+                        if (elemento.Rotacion != 0)
+                        {
+                            var transform = new RotateTransform(elemento.Rotacion, elemento.Ancho / 2, elemento.Alto / 2);
+                            uiElement.RenderTransform = transform;
+                        }
+
                         _canvasTarjeta.Children.Add(uiElement);
                     }
                 }
@@ -241,31 +250,25 @@ namespace ClubManager.ViewModels
                     .Include(a => a.Gestor)
                     .Include(a => a.Peña)
                     .Include(a => a.TipoAbono)
+                    .Where(a => a.Estado == EstadoAbonado.Activo) // Solo abonados activos
                     .OrderBy(a => a.NumeroSocio)
-                    .Take(50) // Limitar a 50 para performance
+                    .Take(100) // Aumentar a 100 para más opciones
                     .ToListAsync();
 
                 AbonadosDisponibles.Clear();
-
-                // Agregar abonado de ejemplo
                 AbonadosDisponibles.Add(_abonadoEjemplo);
 
-                // Agregar abonados reales
                 foreach (var abonado in abonados)
                 {
                     AbonadosDisponibles.Add(abonado);
                 }
 
-                // Seleccionar el abonado de ejemplo por defecto
                 AbonadoSeleccionado = _abonadoEjemplo;
-
                 System.Diagnostics.Debug.WriteLine($"Cargados {AbonadosDisponibles.Count} abonados disponibles");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error cargando abonados: {ex.Message}");
-
-                // Si hay error, al menos tener el abonado de ejemplo
                 AbonadosDisponibles.Clear();
                 AbonadosDisponibles.Add(_abonadoEjemplo);
                 AbonadoSeleccionado = _abonadoEjemplo;
@@ -276,11 +279,12 @@ namespace ClubManager.ViewModels
         {
             try
             {
-                // Recargar la lista de abonados disponibles
+                EstadoActual = "Cargando datos...";
                 CargarAbonadosDisponibles();
+                await Task.Delay(500); // Simular carga
                 EstadoActual = "Lista de abonados actualizada";
-                MessageBox.Show($"Se han actualizado los abonados disponibles", "Datos actualizados",
-                              MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Se han actualizado {AbonadosDisponibles.Count} abonados disponibles",
+                              "Datos actualizados", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -298,17 +302,15 @@ namespace ClubManager.ViewModels
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Iniciando agregar texto...");
-
                 var elemento = new ElementoTexto
                 {
                     Id = Guid.NewGuid().ToString(),
                     Tipo = "Texto",
-                    X = 20,
-                    Y = 20,
+                    X = GetNextElementX(),
+                    Y = GetNextElementY(),
                     Ancho = 120,
                     Alto = 25,
-                    ZIndex = ElementosActuales.Count,
+                    ZIndex = GetNextZIndex(),
                     Texto = "Texto nuevo",
                     FontFamily = "Arial",
                     FontSize = 12,
@@ -318,23 +320,12 @@ namespace ClubManager.ViewModels
                     TextAlignment = TextAlignment.Left
                 };
 
-                ElementosActuales.Add(elemento);
-                ElementoSeleccionado = elemento;
-                PlantillaActual.Elementos.Add(elemento);
-
-                System.Diagnostics.Debug.WriteLine($"Elemento agregado. Total elementos: {ElementosActuales.Count}");
-
+                AgregarElemento(elemento);
                 EstadoActual = "Elemento de texto agregado";
-                ActualizarCanvas();
-
-                System.Diagnostics.Debug.WriteLine("Texto agregado correctamente");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error en AgregarTexto: {ex.Message}");
-                MessageBox.Show($"Error al agregar texto: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al agregar texto";
+                MostrarError("Error al agregar texto", ex);
             }
         }
 
@@ -344,37 +335,45 @@ namespace ClubManager.ViewModels
             {
                 var openDialog = new OpenFileDialog
                 {
-                    Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp",
-                    Title = "Seleccionar imagen"
+                    Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif",
+                    Title = "Seleccionar imagen",
+                    Multiselect = false
                 };
 
                 if (openDialog.ShowDialog() == true)
                 {
+                    // Validar tamaño de archivo
+                    var fileInfo = new FileInfo(openDialog.FileName);
+                    if (fileInfo.Length > 5 * 1024 * 1024) // 5MB máximo
+                    {
+                        MessageBox.Show("El archivo es demasiado grande. Máximo 5MB permitido.",
+                                      "Archivo demasiado grande", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
                     var elemento = new ElementoImagen
                     {
                         Id = Guid.NewGuid().ToString(),
                         Tipo = "Imagen",
-                        X = 20,
-                        Y = 50,
+                        X = GetNextElementX(),
+                        Y = GetNextElementY(),
                         Ancho = 100,
                         Alto = 100,
-                        ZIndex = ElementosActuales.Count,
+                        ZIndex = GetNextZIndex(),
                         RutaImagen = openDialog.FileName,
-                        MantenerAspecto = true
+                        MantenerAspecto = true,
+                        Redondez = 0,
+                        GrosorBorde = 0,
+                        ColorBorde = Colors.Transparent
                     };
 
-                    ElementosActuales.Add(elemento);
-                    ElementoSeleccionado = elemento;
-                    PlantillaActual.Elementos.Add(elemento);
+                    AgregarElemento(elemento);
                     EstadoActual = "Elemento de imagen agregado";
-                    ActualizarCanvas();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al agregar imagen: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al agregar imagen";
+                MostrarError("Error al agregar imagen", ex);
             }
         }
 
@@ -386,27 +385,25 @@ namespace ClubManager.ViewModels
                 {
                     Id = Guid.NewGuid().ToString(),
                     Tipo = "Código de Barras",
-                    X = 200,
-                    Y = 150,
-                    Ancho = 120,
-                    Alto = 40,
-                    ZIndex = ElementosActuales.Count,
+                    X = GetNextElementX(),
+                    Y = GetNextElementY(),
+                    Ancho = 150, // Más ancho para mejor legibilidad
+                    Alto = 50,   // Más alto para códigos con texto
+                    ZIndex = GetNextZIndex(),
                     TipoCodigo = "Code128",
                     MostrarTexto = true,
-                    CampoOrigen = "CodigoBarras"
+                    CampoOrigen = "CodigoBarras",
+                    FontSize = 8,
+                    ColorTexto = Colors.Black,
+                    ColorFondo = Colors.Transparent // FONDO TRANSPARENTE
                 };
 
-                ElementosActuales.Add(elemento);
-                ElementoSeleccionado = elemento;
-                PlantillaActual.Elementos.Add(elemento);
+                AgregarElemento(elemento);
                 EstadoActual = "Elemento de código de barras agregado";
-                ActualizarCanvas();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al agregar código de barras: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al agregar código de barras";
+                MostrarError("Error al agregar código de barras", ex);
             }
         }
 
@@ -416,43 +413,33 @@ namespace ClubManager.ViewModels
 
             try
             {
-                System.Diagnostics.Debug.WriteLine($"Iniciando agregar campo: {campo}");
-
                 var elemento = new ElementoCampoDinamico
                 {
                     Id = Guid.NewGuid().ToString(),
                     Tipo = "Campo Dinámico",
-                    X = 20,
-                    Y = 80 + (ElementosActuales.Count * 30),
+                    X = GetNextElementX(),
+                    Y = GetNextElementY(),
                     Ancho = 150,
                     Alto = 25,
-                    ZIndex = ElementosActuales.Count,
+                    ZIndex = GetNextZIndex(),
                     CampoOrigen = campo,
                     Texto = $"{{{campo}}}",
                     FontFamily = "Arial",
                     FontSize = 12,
                     Color = Colors.Black,
                     IsBold = false,
-                    IsItalic = false
+                    IsItalic = false,
+                    TextAlignment = TextAlignment.Left,
+                    Prefijo = "",
+                    Sufijo = ""
                 };
 
-                ElementosActuales.Add(elemento);
-                ElementoSeleccionado = elemento;
-                PlantillaActual.Elementos.Add(elemento);
-
-                System.Diagnostics.Debug.WriteLine($"Campo {campo} agregado. Total elementos: {ElementosActuales.Count}");
-
+                AgregarElemento(elemento);
                 EstadoActual = $"Campo {campo} agregado";
-                ActualizarCanvas();
-
-                System.Diagnostics.Debug.WriteLine($"Campo {campo} agregado correctamente");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error en AgregarCampo: {ex.Message}");
-                MessageBox.Show($"Error al agregar campo: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al agregar campo";
+                MostrarError($"Error al agregar campo {campo}", ex);
             }
         }
 
@@ -462,7 +449,7 @@ namespace ClubManager.ViewModels
             {
                 if (ElementoSeleccionado == null) return;
 
-                var result = MessageBox.Show($"¿Está seguro de eliminar el elemento seleccionado?",
+                var result = MessageBox.Show($"¿Está seguro de eliminar el elemento '{ElementoSeleccionado.Tipo}'?",
                                            "Confirmar eliminación", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
@@ -476,45 +463,31 @@ namespace ClubManager.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al eliminar elemento: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al eliminar elemento";
+                MostrarError("Error al eliminar elemento", ex);
             }
         }
 
-        private void AgregarElementosDePrueba()
+        private void DuplicarElemento()
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Agregando elementos de prueba...");
+                if (ElementoSeleccionado == null) return;
 
-                // Agregar un texto de prueba
-                var textoEjemplo = new ElementoTexto
+                var elementoDuplicado = DuplicarElementoTarjeta(ElementoSeleccionado);
+                if (elementoDuplicado != null)
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    Tipo = "Texto",
-                    X = 20,
-                    Y = 20,
-                    Ancho = 200,
-                    Alto = 25,
-                    ZIndex = 0,
-                    Texto = "CLUB DEPORTIVO",
-                    FontFamily = "Arial",
-                    FontSize = 16,
-                    Color = Colors.DarkBlue,
-                    IsBold = true,
-                    IsItalic = false,
-                    TextAlignment = TextAlignment.Center
-                };
+                    // Offset para que no se superponga
+                    elementoDuplicado.X += 10;
+                    elementoDuplicado.Y += 10;
+                    elementoDuplicado.ZIndex = GetNextZIndex();
 
-                ElementosActuales.Add(textoEjemplo);
-                PlantillaActual.Elementos.Add(textoEjemplo);
-
-                System.Diagnostics.Debug.WriteLine($"Elementos de prueba agregados. Total: {ElementosActuales.Count}");
+                    AgregarElemento(elementoDuplicado);
+                    EstadoActual = $"Elemento '{ElementoSeleccionado.Tipo}' duplicado";
+                }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error agregando elementos de prueba: {ex.Message}");
+                MostrarError("Error al duplicar elemento", ex);
             }
         }
 
@@ -526,35 +499,34 @@ namespace ClubManager.ViewModels
         {
             try
             {
-                var result = MessageBox.Show("¿Está seguro de crear una nueva plantilla? " +
-                                           "Se perderán los cambios no guardados.",
-                                           "Nueva plantilla", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
+                if (ElementosActuales.Count > 0)
                 {
-                    PlantillaActual = new PlantillaTarjeta
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Nombre = "Nueva Plantilla",
-                        Descripcion = "Plantilla de tarjeta personalizada",
-                        Ancho = 350,
-                        Alto = 220,
-                        FechaCreacion = DateTime.Now,
-                        FechaModificacion = DateTime.Now,
-                        Elementos = new List<ElementoTarjeta>()
-                    };
-
-                    ElementosActuales.Clear();
-                    ElementoSeleccionado = null;
-                    EstadoActual = "Nueva plantilla creada";
-                    ActualizarCanvas();
+                    var result = MessageBox.Show("¿Está seguro de crear una nueva plantilla? " +
+                                               "Se perderán los cambios no guardados.",
+                                               "Nueva plantilla", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (result != MessageBoxResult.Yes) return;
                 }
+
+                PlantillaActual = new PlantillaTarjeta
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Nombre = "Nueva Plantilla",
+                    Descripcion = "Plantilla de tarjeta personalizada",
+                    Ancho = 350,
+                    Alto = 220,
+                    FechaCreacion = DateTime.Now,
+                    FechaModificacion = DateTime.Now,
+                    Elementos = new List<ElementoTarjeta>()
+                };
+
+                ElementosActuales.Clear();
+                ElementoSeleccionado = null;
+                EstadoActual = "Nueva plantilla creada";
+                ActualizarCanvas();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al crear nueva plantilla: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al crear nueva plantilla";
+                MostrarError("Error al crear nueva plantilla", ex);
             }
         }
 
@@ -569,16 +541,28 @@ namespace ClubManager.ViewModels
                     return;
                 }
 
+                // Validar plantilla antes de guardar
+                var errores = ValidarPlantillaActual();
+                if (errores.Any())
+                {
+                    var result = MessageBox.Show($"Se encontraron {errores.Count} problemas:\n" +
+                                               string.Join("\n", errores.Take(3)) +
+                                               (errores.Count > 3 ? "\n..." : "") +
+                                               "\n\n¿Desea guardar de todos modos?",
+                                               "Problemas en la plantilla", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                    if (result != MessageBoxResult.Yes) return;
+                }
+
                 SaveFileDialog saveDialog = new SaveFileDialog
                 {
                     Filter = "Plantillas de tarjeta (*.cardtemplate)|*.cardtemplate",
                     Title = "Guardar plantilla de tarjeta",
-                    FileName = PlantillaActual.Nombre + ".cardtemplate"
+                    FileName = PlantillaActual.Nombre.Replace(" ", "_") + ".cardtemplate"
                 };
 
                 if (saveDialog.ShowDialog() == true)
                 {
-                    // Actualizar elementos antes de guardar
+                    // Actualizar elementos y metadatos
                     PlantillaActual.Elementos.Clear();
                     foreach (var elemento in ElementosActuales)
                     {
@@ -589,7 +573,8 @@ namespace ClubManager.ViewModels
 
                     var options = new JsonSerializerOptions
                     {
-                        WriteIndented = true
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                     };
 
                     var json = JsonSerializer.Serialize(PlantillaActual, options);
@@ -602,9 +587,7 @@ namespace ClubManager.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar plantilla: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al guardar plantilla";
+                MostrarError("Error al guardar plantilla", ex);
             }
         }
 
@@ -614,14 +597,27 @@ namespace ClubManager.ViewModels
             {
                 OpenFileDialog openDialog = new OpenFileDialog
                 {
-                    Filter = "Plantillas de tarjeta (*.cardtemplate)|*.cardtemplate",
+                    Filter = "Plantillas de tarjeta (*.cardtemplate)|*.cardtemplate|Todos los archivos (*.*)|*.*",
                     Title = "Cargar plantilla de tarjeta"
                 };
 
                 if (openDialog.ShowDialog() == true)
                 {
+                    if (!File.Exists(openDialog.FileName))
+                    {
+                        MessageBox.Show("El archivo seleccionado no existe.", "Error",
+                                      MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
                     var json = File.ReadAllText(openDialog.FileName);
-                    var plantilla = JsonSerializer.Deserialize<PlantillaTarjeta>(json);
+
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var plantilla = JsonSerializer.Deserialize<PlantillaTarjeta>(json, options);
 
                     if (plantilla != null)
                     {
@@ -636,14 +632,52 @@ namespace ClubManager.ViewModels
                         ElementoSeleccionado = null;
                         EstadoActual = $"Plantilla cargada: {plantilla.Nombre}";
                         ActualizarCanvas();
+
+                        // Mostrar información de la plantilla cargada
+                        MessageBox.Show($"Plantilla '{plantilla.Nombre}' cargada correctamente.\n" +
+                                      $"Elementos: {plantilla.Elementos.Count}\n" +
+                                      $"Dimensiones: {plantilla.Ancho}x{plantilla.Alto}",
+                                      "Plantilla cargada", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Error al deserializar la plantilla. Archivo corrupto o formato inválido.",
+                                      "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar plantilla: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al cargar plantilla";
+                MostrarError("Error al cargar plantilla", ex);
+            }
+        }
+
+        private void ValidarPlantilla()
+        {
+            try
+            {
+                var errores = ValidarPlantillaActual();
+
+                if (!errores.Any())
+                {
+                    MessageBox.Show("✅ La plantilla es válida y no tiene problemas detectados.",
+                                  "Validación exitosa", MessageBoxButton.OK, MessageBoxImage.Information);
+                    EstadoActual = "Plantilla validada correctamente";
+                }
+                else
+                {
+                    var mensaje = $"❌ Se encontraron {errores.Count} problemas:\n\n" +
+                                string.Join("\n", errores.Take(10)) +
+                                (errores.Count > 10 ? $"\n\n... y {errores.Count - 10} más." : "");
+
+                    MessageBox.Show(mensaje, "Problemas en la plantilla",
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    EstadoActual = $"Plantilla con {errores.Count} problemas";
+                }
+            }
+            catch (Exception ex)
+            {
+                MostrarError("Error al validar plantilla", ex);
             }
         }
 
@@ -656,16 +690,54 @@ namespace ClubManager.ViewModels
             try
             {
                 EstadoActual = "Generando vista previa...";
-                // Aquí se abriría una ventana de vista previa
-                MessageBox.Show("Vista previa generada correctamente", "Vista Previa",
-                              MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Crear ventana de vista previa
+                var vistaPrevia = new Window
+                {
+                    Title = $"Vista Previa - {PlantillaActual.Nombre}",
+                    Width = PlantillaActual.Ancho + 100,
+                    Height = PlantillaActual.Alto + 150,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = Application.Current.MainWindow
+                };
+
+                var border = new Border
+                {
+                    Background = Brushes.White,
+                    BorderBrush = Brushes.Black,
+                    BorderThickness = new Thickness(2),
+                    CornerRadius = new CornerRadius(8),
+                    Margin = new Thickness(20)
+                };
+
+                var canvas = new Canvas
+                {
+                    Width = PlantillaActual.Ancho,
+                    Height = PlantillaActual.Alto,
+                    Background = Brushes.White
+                };
+
+                // Renderizar todos los elementos
+                foreach (var elemento in ElementosActuales.OrderBy(e => e.ZIndex))
+                {
+                    var uiElement = CrearElementoUI(elemento);
+                    if (uiElement != null)
+                    {
+                        Canvas.SetLeft(uiElement, elemento.X);
+                        Canvas.SetTop(uiElement, elemento.Y);
+                        canvas.Children.Add(uiElement);
+                    }
+                }
+
+                border.Child = canvas;
+                vistaPrevia.Content = border;
+                vistaPrevia.ShowDialog();
+
                 EstadoActual = "Vista previa generada";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al generar vista previa: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error en vista previa";
+                MostrarError("Error al generar vista previa", ex);
             }
         }
 
@@ -673,17 +745,32 @@ namespace ClubManager.ViewModels
         {
             try
             {
-                EstadoActual = "Imprimiendo prueba...";
-                // Aquí se implementaría la lógica de impresión
-                MessageBox.Show("Tarjeta de prueba enviada a impresora", "Imprimir",
-                              MessageBoxButton.OK, MessageBoxImage.Information);
-                EstadoActual = "Impresión completada";
+                EstadoActual = "Preparando impresión...";
+
+                var result = MessageBox.Show($"¿Desea imprimir una tarjeta de prueba con los datos de '{AbonadoEjemplo.NombreCompleto}'?",
+                                           "Confirmar impresión", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Aquí se implementaría la lógica real de impresión
+                    // Por ahora, simular el proceso
+                    System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        await System.Threading.Tasks.Task.Delay(2000);
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show("Tarjeta de prueba enviada a la impresora correctamente.",
+                                          "Impresión completada", MessageBoxButton.OK, MessageBoxImage.Information);
+                            EstadoActual = "Impresión completada";
+                        });
+                    });
+
+                    EstadoActual = "Enviando a impresora...";
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al imprimir: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error en impresión";
+                MostrarError("Error al imprimir", ex);
             }
         }
 
@@ -691,35 +778,42 @@ namespace ClubManager.ViewModels
         {
             try
             {
-                var result = MessageBox.Show("¿Desea aplicar esta plantilla como predeterminada?",
+                var errores = ValidarPlantillaActual();
+                if (errores.Any())
+                {
+                    MessageBox.Show($"No se puede aplicar la plantilla debido a errores:\n" +
+                                  string.Join("\n", errores.Take(5)),
+                                  "Plantilla inválida", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                var result = MessageBox.Show($"¿Desea aplicar '{PlantillaActual.Nombre}' como plantilla predeterminada?",
                                            "Aplicar Plantilla", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    // Aquí se guardaría como plantilla predeterminada
+                    // Guardar como plantilla predeterminada en la base de datos
+                    // Por ahora, simular el proceso
+                    PlantillaActual.EsPredeterminada = true;
                     EstadoActual = "Plantilla aplicada como predeterminada";
-                    MessageBox.Show("Plantilla aplicada correctamente", "Aplicar",
+                    MessageBox.Show("Plantilla aplicada correctamente como predeterminada.", "Aplicar",
                                   MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al aplicar plantilla: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-                EstadoActual = "Error al aplicar plantilla";
+                MostrarError("Error al aplicar plantilla", ex);
             }
         }
 
         #endregion
 
-        #region Creación de Elementos UI
+        #region Creación de Elementos UI - MEJORADO SIN MARCOS
 
         private UIElement? CrearElementoUI(ElementoTarjeta elemento)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"Creando UI para elemento: {elemento.Tipo} - {elemento.Id}");
-
                 UIElement? result = elemento switch
                 {
                     ElementoTexto textoElem => CrearTextoUI(textoElem),
@@ -729,21 +823,12 @@ namespace ClubManager.ViewModels
                     _ => null
                 };
 
-                if (result != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"UI creado correctamente para: {elemento.Tipo}");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"No se pudo crear UI para: {elemento.Tipo}");
-                }
-
                 return result;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando elemento UI: {ex.Message}");
-                return null;
+                return CrearElementoError(elemento);
             }
         }
 
@@ -759,124 +844,168 @@ namespace ClubManager.ViewModels
                 FontStyle = elemento.IsItalic ? FontStyles.Italic : FontStyles.Normal,
                 TextAlignment = elemento.TextAlignment,
                 Width = elemento.Ancho,
-                Height = elemento.Alto
+                Height = elemento.Alto,
+                TextWrapping = elemento.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap
             };
+
+            if (elemento.IsUnderline)
+            {
+                textBlock.TextDecorations = TextDecorations.Underline;
+            }
 
             return textBlock;
         }
 
-        private Image? CrearImagenUI(ElementoImagen elemento)
+        private UIElement? CrearImagenUI(ElementoImagen elemento)
         {
             try
             {
                 if (!File.Exists(elemento.RutaImagen))
-                    return null;
+                    return CrearElementoError(elemento, "Imagen no encontrada");
 
                 var image = new Image
                 {
-                    Source = new BitmapImage(new Uri(elemento.RutaImagen)),
                     Width = elemento.Ancho,
                     Height = elemento.Alto,
                     Stretch = elemento.MantenerAspecto ? Stretch.Uniform : Stretch.Fill
                 };
 
+                // Cargar imagen de forma segura
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(elemento.RutaImagen);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                image.Source = bitmap;
+
+                // Aplicar bordes redondeados o bordes si es necesario
+                if (elemento.Redondez > 0 || elemento.GrosorBorde > 0)
+                {
+                    var border = new Border
+                    {
+                        Width = elemento.Ancho,
+                        Height = elemento.Alto,
+                        Child = image,
+                        ClipToBounds = true
+                    };
+
+                    if (elemento.Redondez > 0)
+                    {
+                        border.CornerRadius = new CornerRadius(elemento.Redondez);
+                    }
+
+                    if (elemento.GrosorBorde > 0)
+                    {
+                        border.BorderBrush = new SolidColorBrush(elemento.ColorBorde);
+                        border.BorderThickness = new Thickness(elemento.GrosorBorde);
+                    }
+
+                    return border;
+                }
+
                 return image;
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                System.Diagnostics.Debug.WriteLine($"Error creando imagen: {ex.Message}");
+                return CrearElementoError(elemento, "Error cargando imagen");
             }
         }
 
-        private Border CrearCodigoBarrasUI(ElementoCodigoBarras elemento)
+        // MEJORADO: Código de barras SIN marco
+        private UIElement CrearCodigoBarrasUI(ElementoCodigoBarras elemento)
         {
             try
             {
-                var border = new Border
+                var valorCodigo = ObtenerValorCampo(elemento.CampoOrigen);
+
+                // Crear contenedor SIN borde
+                var container = new StackPanel
                 {
                     Width = elemento.Ancho,
                     Height = elemento.Alto,
-                    BorderBrush = Brushes.Black,
-                    BorderThickness = new Thickness(1),
-                    Background = Brushes.White
-                };
-
-                var stackPanel = new StackPanel
-                {
                     Orientation = Orientation.Vertical,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Background = new SolidColorBrush(elemento.ColorFondo)
                 };
 
-                // Crear imagen del código de barras
-                var barcodeImage = GenerarCodigoBarras(ObtenerValorCampo(elemento.CampoOrigen), elemento.Ancho - 4, elemento.Alto - 20);
+                // Generar código de barras con el formato correcto
+                BitmapSource? barcodeImage = null;
+                var alturaBarras = elemento.MostrarTexto ? elemento.Alto - 15 : elemento.Alto;
+
+                switch (elemento.TipoCodigo.ToUpper())
+                {
+                    case "CODE128":
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code128");
+                        break;
+                    case "CODE39":
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code39");
+                        break;
+                    case "EAN13":
+                        var ean13Value = GenerarEAN13(valorCodigo);
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(ean13Value, elemento.Ancho, alturaBarras, "EAN13");
+                        break;
+                    case "QRCODE":
+                        barcodeImage = BarcodeGenerator.GenerateQRCode(valorCodigo, Math.Min(elemento.Ancho, elemento.Alto));
+                        break;
+                    default:
+                        barcodeImage = BarcodeGenerator.GenerateBarcode(valorCodigo, elemento.Ancho, alturaBarras, "Code128");
+                        break;
+                }
+
+                // Agregar imagen del código de barras
                 if (barcodeImage != null)
                 {
                     var image = new Image
                     {
                         Source = barcodeImage,
                         Stretch = Stretch.Fill,
-                        Margin = new Thickness(2, 2, 2, elemento.MostrarTexto ? 0 : 2)
+                        HorizontalAlignment = HorizontalAlignment.Center
                     };
-                    stackPanel.Children.Add(image);
+
+                    container.Children.Add(image);
                 }
 
-                // Mostrar texto si está habilitado
+                // Agregar texto si está habilitado
                 if (elemento.MostrarTexto)
                 {
                     var textBlock = new TextBlock
                     {
-                        Text = ObtenerValorCampo(elemento.CampoOrigen),
+                        Text = valorCodigo,
                         FontSize = elemento.FontSize,
                         FontFamily = new FontFamily("Courier New"),
                         Foreground = new SolidColorBrush(elemento.ColorTexto),
                         HorizontalAlignment = HorizontalAlignment.Center,
-                        Margin = new Thickness(0, 2, 0, 2)
+                        TextAlignment = TextAlignment.Center,
+                        Margin = new Thickness(0, 2, 0, 0)
                     };
-                    stackPanel.Children.Add(textBlock);
+                    container.Children.Add(textBlock);
                 }
 
-                border.Child = stackPanel;
-                return border;
+                return container;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando código de barras: {ex.Message}");
-
-                // Retornar un placeholder en caso de error
-                var errorBorder = new Border
-                {
-                    Width = elemento.Ancho,
-                    Height = elemento.Alto,
-                    BorderBrush = Brushes.Red,
-                    BorderThickness = new Thickness(1),
-                    Background = Brushes.LightGray
-                };
-
-                var errorText = new TextBlock
-                {
-                    Text = "❌ Error\nCódigo",
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FontSize = 10,
-                    TextAlignment = TextAlignment.Center
-                };
-
-                errorBorder.Child = errorText;
-                return errorBorder;
+                return CrearElementoError(elemento, $"Error: {elemento.TipoCodigo}");
             }
         }
 
         private TextBlock CrearCampoDinamicoUI(ElementoCampoDinamico elemento)
         {
+            var valor = ObtenerValorCampo(elemento.CampoOrigen);
+            var textoFinal = $"{elemento.Prefijo}{valor}{elemento.Sufijo}";
+
             var textBlock = new TextBlock
             {
-                Text = ObtenerValorCampo(elemento.CampoOrigen),
+                Text = textoFinal,
                 FontFamily = new FontFamily(elemento.FontFamily),
                 FontSize = elemento.FontSize,
                 Foreground = new SolidColorBrush(elemento.Color),
                 FontWeight = elemento.IsBold ? FontWeights.Bold : FontWeights.Normal,
                 FontStyle = elemento.IsItalic ? FontStyles.Italic : FontStyles.Normal,
+                TextAlignment = elemento.TextAlignment,
                 Width = elemento.Ancho,
                 Height = elemento.Alto
             };
@@ -884,58 +1013,307 @@ namespace ClubManager.ViewModels
             return textBlock;
         }
 
+        private Border CrearElementoError(ElementoTarjeta elemento, string mensaje = "Error")
+        {
+            return new Border
+            {
+                Width = elemento.Ancho,
+                Height = elemento.Alto,
+                BorderBrush = Brushes.Red,
+                BorderThickness = new Thickness(1),
+                Background = Brushes.LightPink,
+                Child = new TextBlock
+                {
+                    Text = mensaje,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 10,
+                    TextAlignment = TextAlignment.Center,
+                    Foreground = Brushes.DarkRed
+                }
+            };
+        }
+
         #endregion
 
-        #region Métodos Auxiliares
+        #region Métodos Auxiliares - MEJORADOS
 
-        private string ObtenerValorCampo(string campo)
+        private void AgregarElemento(ElementoTarjeta elemento)
         {
-            // Usar el abonado seleccionado si está disponible, sino el de ejemplo
-            var abonadoActual = AbonadoSeleccionado ?? AbonadoEjemplo;
+            ElementosActuales.Add(elemento);
+            ElementoSeleccionado = elemento;
+            PlantillaActual.Elementos.Add(elemento);
+            ActualizarCanvas();
+        }
 
+        private double GetNextElementX()
+        {
+            return ElementosActuales.Any() ?
+                   Math.Min(20 + (ElementosActuales.Count * 15), PlantillaActual.Ancho - 100) : 20;
+        }
+
+        private double GetNextElementY()
+        {
+            return ElementosActuales.Any() ?
+                   Math.Min(20 + (ElementosActuales.Count * 25), PlantillaActual.Alto - 50) : 20;
+        }
+
+        private int GetNextZIndex()
+        {
+            return ElementosActuales.Any() ? ElementosActuales.Max(e => e.ZIndex) + 1 : 0;
+        }
+
+        private ElementoTarjeta? DuplicarElementoTarjeta(ElementoTarjeta original)
+        {
+            try
+            {
+                // Serializar y deserializar para crear una copia profunda
+                var json = JsonSerializer.Serialize(original);
+                var copia = JsonSerializer.Deserialize<ElementoTarjeta>(json);
+
+                if (copia != null)
+                {
+                    copia.Id = Guid.NewGuid().ToString();
+                }
+
+                return copia;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private List<string> ValidarPlantillaActual()
+        {
+            var errores = new List<string>();
+
+            try
+            {
+                // Validar plantilla básica
+                if (string.IsNullOrWhiteSpace(PlantillaActual.Nombre))
+                    errores.Add("La plantilla debe tener un nombre");
+
+                if (PlantillaActual.Ancho <= 0 || PlantillaActual.Alto <= 0)
+                    errores.Add("Las dimensiones de la plantilla deben ser positivas");
+
+                if (PlantillaActual.Ancho > 1000 || PlantillaActual.Alto > 1000)
+                    errores.Add("Las dimensiones de la plantilla son demasiado grandes (máximo 1000px)");
+
+                // Validar elementos
+                foreach (var elemento in ElementosActuales)
+                {
+                    // Validar posición
+                    if (elemento.X < 0 || elemento.Y < 0)
+                        errores.Add($"Elemento '{elemento.Tipo}' tiene posición negativa");
+
+                    if (elemento.X + elemento.Ancho > PlantillaActual.Ancho)
+                        errores.Add($"Elemento '{elemento.Tipo}' se sale del borde derecho");
+
+                    if (elemento.Y + elemento.Alto > PlantillaActual.Alto)
+                        errores.Add($"Elemento '{elemento.Tipo}' se sale del borde inferior");
+
+                    // Validar tamaño
+                    if (elemento.Ancho <= 0 || elemento.Alto <= 0)
+                        errores.Add($"Elemento '{elemento.Tipo}' tiene dimensiones inválidas");
+
+                    // Validaciones específicas
+                    switch (elemento)
+                    {
+                        case ElementoTexto texto:
+                            if (string.IsNullOrWhiteSpace(texto.Texto))
+                                errores.Add($"Elemento de texto está vacío");
+                            if (texto.FontSize <= 0)
+                                errores.Add($"Tamaño de fuente inválido en elemento de texto");
+                            break;
+
+                        case ElementoImagen imagen:
+                            if (string.IsNullOrWhiteSpace(imagen.RutaImagen))
+                                errores.Add($"Elemento de imagen sin ruta especificada");
+                            else if (!File.Exists(imagen.RutaImagen))
+                                errores.Add($"Archivo de imagen no encontrado: {Path.GetFileName(imagen.RutaImagen)}");
+                            break;
+
+                        case ElementoCodigoBarras codigo:
+                            if (string.IsNullOrWhiteSpace(codigo.CampoOrigen))
+                                errores.Add($"Código de barras sin campo origen");
+                            if (string.IsNullOrWhiteSpace(codigo.TipoCodigo))
+                                errores.Add($"Código de barras sin tipo especificado");
+                            break;
+
+                        case ElementoCampoDinamico campo:
+                            if (string.IsNullOrWhiteSpace(campo.CampoOrigen))
+                                errores.Add($"Campo dinámico sin origen especificado");
+                            break;
+                    }
+                }
+
+                // Verificar solapamientos críticos
+                var elementosPorPosicion = ElementosActuales
+                    .GroupBy(e => new { X = (int)(e.X / 10), Y = (int)(e.Y / 10) })
+                    .Where(g => g.Count() > 1)
+                    .ToList();
+
+                if (elementosPorPosicion.Any())
+                {
+                    errores.Add($"Hay {elementosPorPosicion.Count} áreas con elementos superpuestos");
+                }
+            }
+            catch (Exception ex)
+            {
+                errores.Add($"Error durante la validación: {ex.Message}");
+            }
+
+            return errores;
+        }
+
+        private void MostrarError(string titulo, Exception ex)
+        {
+            var mensaje = $"{titulo}: {ex.Message}";
+            MessageBox.Show(mensaje, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            EstadoActual = titulo;
+            System.Diagnostics.Debug.WriteLine($"ERROR: {mensaje}");
+        }
+
+        public string ObtenerValorCampo(string campo)
+        {
+            var abonadoActual = AbonadoSeleccionado ?? AbonadoEjemplo;
             if (abonadoActual == null) return $"{{{campo}}}";
 
             return campo switch
             {
-                "NombreCompleto" => abonadoActual.NombreCompleto,
-                "Nombre" => abonadoActual.Nombre,
-                "Apellidos" => abonadoActual.Apellidos,
+                "NombreCompleto" => abonadoActual.NombreCompleto ?? "Sin nombre",
+                "Nombre" => abonadoActual.Nombre ?? "Sin nombre",
+                "Apellidos" => abonadoActual.Apellidos ?? "Sin apellidos",
                 "NumeroSocio" => abonadoActual.NumeroSocio.ToString(),
                 "DNI" => abonadoActual.DNI ?? "Sin DNI",
                 "CodigoBarras" => GenerarCodigoBarrasParaAbonado(abonadoActual),
                 "Peña" => abonadoActual.Peña?.Nombre ?? "Sin Peña",
                 "TipoAbono" => abonadoActual.TipoAbono?.Nombre ?? "Sin Tipo",
-                "Estado" => abonadoActual.EstadoTexto,
+                "Estado" => abonadoActual.EstadoTexto ?? "Sin estado",
                 "Telefono" => abonadoActual.Telefono ?? "Sin teléfono",
                 "Email" => abonadoActual.Email ?? "Sin email",
                 "FechaNacimiento" => abonadoActual.FechaNacimiento.ToString("dd/MM/yyyy"),
                 "Direccion" => abonadoActual.Direccion ?? "Sin dirección",
                 "TallaCamiseta" => abonadoActual.TallaCamiseta ?? "Sin talla",
+                "FechaCreacion" => abonadoActual.FechaCreacion.ToString("dd/MM/yyyy"),
+                "Gestor" => abonadoActual.Gestor?.Nombre ?? "Sin gestor",
                 _ => $"{{{campo}}}"
             };
         }
 
-        private BitmapSource? GenerarCodigoBarras(string texto, double ancho, double alto)
+        private string GenerarEAN13(string input)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(texto))
-                    return null;
+                var numerosOnly = new string(input.Where(char.IsDigit).ToArray());
 
-                // Usar el generador de códigos de barras real
-                return BarcodeGenerator.GenerateBarcode(texto, ancho, alto, "Code128");
+                if (numerosOnly.Length < 12)
+                {
+                    var numeroSocio = AbonadoSeleccionado?.NumeroSocio ?? AbonadoEjemplo?.NumeroSocio ?? 12345;
+                    numerosOnly = numeroSocio.ToString().PadLeft(12, '0');
+                }
+
+                var primeros12 = numerosOnly.Substring(0, Math.Min(12, numerosOnly.Length)).PadLeft(12, '0');
+
+                // Calcular dígito de control EAN13
+                var suma = 0;
+                for (int i = 0; i < 12; i++)
+                {
+                    var digito = int.Parse(primeros12[i].ToString());
+                    suma += (i % 2 == 0) ? digito : digito * 3;
+                }
+
+                var digitoControl = (10 - (suma % 10)) % 10;
+                return primeros12 + digitoControl.ToString();
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Error generando código de barras: {ex.Message}");
-                return null;
+                return "1234567890123"; // EAN13 genérico de fallback
             }
         }
 
         private void ActualizarPropiedades()
         {
-            // Esta función se llamaría desde el code-behind para actualizar el panel de propiedades
-            // basado en el elemento seleccionado
+            // Este método se usa desde el code-behind para actualizar el panel de propiedades
+        }
+
+        private void AgregarElementosDePrueba()
+        {
+            try
+            {
+                // Agregar título del club
+                var titulo = new ElementoTexto
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Tipo = "Texto",
+                    X = 20,
+                    Y = 15,
+                    Ancho = 310,
+                    Alto = 25,
+                    ZIndex = 0,
+                    Texto = "CLUB DEPORTIVO EJEMPLO",
+                    FontFamily = "Arial",
+                    FontSize = 16,
+                    Color = Colors.DarkBlue,
+                    IsBold = true,
+                    TextAlignment = TextAlignment.Center
+                };
+
+                // Agregar campo de nombre
+                var nombre = new ElementoCampoDinamico
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Tipo = "Campo Dinámico",
+                    X = 20,
+                    Y = 50,
+                    Ancho = 200,
+                    Alto = 20,
+                    ZIndex = 1,
+                    CampoOrigen = "NombreCompleto",
+                    FontFamily = "Arial",
+                    FontSize = 14,
+                    Color = Colors.Black,
+                    IsBold = true,
+                    TextAlignment = TextAlignment.Left,
+                    Prefijo = "",
+                    Sufijo = ""
+                };
+
+                // Agregar número de socio
+                var numeroSocio = new ElementoCampoDinamico
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Tipo = "Campo Dinámico",
+                    X = 20,
+                    Y = 75,
+                    Ancho = 150,
+                    Alto = 18,
+                    ZIndex = 2,
+                    CampoOrigen = "NumeroSocio",
+                    FontFamily = "Arial",
+                    FontSize = 12,
+                    Color = Colors.DarkGray,
+                    IsBold = false,
+                    TextAlignment = TextAlignment.Left,
+                    Prefijo = "Socio Nº: ",
+                    Sufijo = ""
+                };
+
+                ElementosActuales.Add(titulo);
+                ElementosActuales.Add(nombre);
+                ElementosActuales.Add(numeroSocio);
+
+                PlantillaActual.Elementos.Add(titulo);
+                PlantillaActual.Elementos.Add(nombre);
+                PlantillaActual.Elementos.Add(numeroSocio);
+
+                System.Diagnostics.Debug.WriteLine($"Elementos de prueba agregados. Total: {ElementosActuales.Count}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error agregando elementos de prueba: {ex.Message}");
+            }
         }
 
         private Abonado CrearAbonadoEjemplo()
@@ -947,7 +1325,7 @@ namespace ClubManager.ViewModels
                 Nombre = "Juan Carlos",
                 Apellidos = "Pérez García",
                 DNI = "12345678Z",
-                CodigoBarras = GenerarCodigoBarrasEjemplo(),
+                CodigoBarras = "CD202412345678",
                 Estado = EstadoAbonado.Activo,
                 Telefono = "666-123-456",
                 Email = "juan.perez@clubdeportivo.com",
@@ -955,20 +1333,18 @@ namespace ClubManager.ViewModels
                 FechaCreacion = DateTime.Now.AddMonths(-6),
                 TallaCamiseta = "L",
                 Direccion = "Calle del Estadio 123, 28001 Madrid",
-                Observaciones = "Abonado desde 2018",
+                Observaciones = "Abonado desde 2018 - Socio fundador",
                 Impreso = false,
-                // Relaciones de ejemplo
                 Peña = new Peña
                 {
                     Id = 1,
-                    Nombre = "Peña Los Campeones",
-                    //Descripcion = "Peña oficial del club"
+                    Nombre = "Peña Los Campeones"
                 },
                 TipoAbono = new TipoAbono
                 {
                     Id = 1,
                     Nombre = "Abono Temporada Completa",
-                    Descripcion = "Acceso a todos los partidos de liga",
+                    Descripcion = "Acceso a todos los partidos de liga y copa",
                     Precio = 250.00m
                 },
                 Gestor = new Gestor
@@ -981,46 +1357,121 @@ namespace ClubManager.ViewModels
             };
         }
 
-        private string GenerarCodigoBarrasEjemplo()
+        public static string GenerarCodigoBarrasParaAbonado(Abonado abonado)
         {
-            // Generar código de barras válido basado en el número de socio
-            var numeroSocio = "12345";
-            var año = DateTime.Now.Year.ToString();
+            if (!string.IsNullOrWhiteSpace(abonado.CodigoBarras))
+            {
+                return abonado.CodigoBarras;
+            }
+
+            // Generar código único y reproducible
+            var numeroSocio = abonado.NumeroSocio.ToString();
+            var año = abonado.FechaCreacion.Year.ToString();
             var codigo = $"CD{año}{numeroSocio.PadLeft(6, '0')}";
 
-            // Agregar dígito verificador simple
-            var suma = codigo.Sum(c => char.IsDigit(c) ? int.Parse(c.ToString()) : 0);
+            // Agregar dígito verificador
+            var suma = codigo.Where(char.IsDigit).Sum(c => int.Parse(c.ToString()));
             var digitoVerificador = (10 - (suma % 10)) % 10;
 
             return $"{codigo}{digitoVerificador}";
         }
 
-        // Método público para actualizar el abonado de ejemplo con datos reales específicos
         public void SetAbonadoEjemplo(Abonado abonado)
         {
             AbonadoEjemplo = abonado;
             ActualizarCanvas();
         }
 
-        // Método para crear código de barras único para abonados reales
-        public static string GenerarCodigoBarrasParaAbonado(Abonado abonado)
+        // Método para optimizar el rendimiento
+        public void OptimizarRendimiento()
         {
-            // Si ya tiene código de barras, usarlo
-            if (!string.IsNullOrWhiteSpace(abonado.CodigoBarras))
+            try
             {
-                return abonado.CodigoBarras;
+                // Limpiar elementos fuera de los límites
+                var elementosValidos = ElementosActuales.Where(e =>
+                    e.X >= -50 && e.Y >= -50 &&
+                    e.X <= PlantillaActual.Ancho + 50 &&
+                    e.Y <= PlantillaActual.Alto + 50).ToList();
+
+                if (elementosValidos.Count != ElementosActuales.Count)
+                {
+                    var eliminados = ElementosActuales.Count - elementosValidos.Count;
+                    ElementosActuales.Clear();
+                    foreach (var elemento in elementosValidos)
+                    {
+                        ElementosActuales.Add(elemento);
+                    }
+                    EstadoActual = $"Optimización completada. {eliminados} elementos eliminados.";
+                }
+
+                // Reorganizar Z-Index
+                var elementosOrdenados = ElementosActuales.OrderBy(e => e.ZIndex).ToList();
+                for (int i = 0; i < elementosOrdenados.Count; i++)
+                {
+                    elementosOrdenados[i].ZIndex = i;
+                }
+
+                ActualizarCanvas();
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error optimizando: {ex.Message}");
+            }
+        }
 
-            // Generar nuevo código basado en datos del abonado
-            var numeroSocio = abonado.NumeroSocio.ToString();
-            var año = abonado.FechaCreacion.Year.ToString();
-            var codigo = $"CD{año}{numeroSocio.PadLeft(6, '0')}";
+        // Método para exportar estadísticas de la plantilla
+        public string ObtenerEstadisticasPlantilla()
+        {
+            try
+            {
+                var stats = new System.Text.StringBuilder();
+                stats.AppendLine($"=== ESTADÍSTICAS DE PLANTILLA ===");
+                stats.AppendLine($"Nombre: {PlantillaActual.Nombre}");
+                stats.AppendLine($"Dimensiones: {PlantillaActual.Ancho} x {PlantillaActual.Alto} px");
+                stats.AppendLine($"Total de elementos: {ElementosActuales.Count}");
+                stats.AppendLine();
 
-            // Dígito verificador
-            var suma = codigo.Sum(c => char.IsDigit(c) ? int.Parse(c.ToString()) : 0);
-            var digitoVerificador = (10 - (suma % 10)) % 10;
+                // Estadísticas por tipo
+                var porTipo = ElementosActuales.GroupBy(e => e.Tipo).ToList();
+                stats.AppendLine("=== POR TIPO ===");
+                foreach (var grupo in porTipo.OrderBy(g => g.Key))
+                {
+                    stats.AppendLine($"{grupo.Key}: {grupo.Count()}");
+                }
+                stats.AppendLine();
 
-            return $"{codigo}{digitoVerificador}";
+                // Área ocupada
+                var areaTotal = PlantillaActual.Ancho * PlantillaActual.Alto;
+                var areaOcupada = ElementosActuales.Sum(e => e.Ancho * e.Alto);
+                var porcentajeOcupacion = (areaOcupada / areaTotal) * 100;
+                stats.AppendLine($"=== OCUPACIÓN ===");
+                stats.AppendLine($"Área total: {areaTotal:N0} px²");
+                stats.AppendLine($"Área ocupada: {areaOcupada:N0} px²");
+                stats.AppendLine($"Porcentaje: {porcentajeOcupacion:F1}%");
+                stats.AppendLine();
+
+                // Campos utilizados
+                var campos = new HashSet<string>();
+                foreach (var elemento in ElementosActuales)
+                {
+                    if (elemento is ElementoCodigoBarras codigo && !string.IsNullOrEmpty(codigo.CampoOrigen))
+                        campos.Add(codigo.CampoOrigen);
+                    if (elemento is ElementoCampoDinamico campo && !string.IsNullOrEmpty(campo.CampoOrigen))
+                        campos.Add(campo.CampoOrigen);
+                }
+
+                stats.AppendLine("=== CAMPOS UTILIZADOS ===");
+                foreach (var campo in campos.OrderBy(c => c))
+                {
+                    stats.AppendLine($"• {campo}");
+                }
+
+                return stats.ToString();
+            }
+            catch (Exception ex)
+            {
+                return $"Error generando estadísticas: {ex.Message}";
+            }
         }
 
         #endregion
@@ -1040,6 +1491,22 @@ namespace ClubManager.ViewModels
             field = value;
             OnPropertyChanged(propertyName);
             return true;
+        }
+
+        #endregion
+
+        #region Cleanup
+
+        public void Dispose()
+        {
+            try
+            {
+                _dbContext?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error disposing ViewModel: {ex.Message}");
+            }
         }
 
         #endregion

@@ -70,9 +70,11 @@
 
     <!-- Botones de Colores -->
     <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+        <Setter Property="Padding" Value="0"/>
         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Padding" Value="0"/>
     </Style>
 
     <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
@@ -159,7 +161,7 @@
         <Setter Property="Foreground" Value="{DynamicResource TextBoxForegroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="8"/>
+        <Setter Property="Padding" Value="0"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Height" Value="35"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>

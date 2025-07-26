@@ -45,3 +45,4 @@ global using ComboBox = System.Windows.Controls.ComboBox;
 global using CheckBox = System.Windows.Controls.CheckBox;
 global using Button = System.Windows.Controls.Button;
 global using Panel = System.Windows.Controls.Panel;
+global using Size = System.Windows.Size;

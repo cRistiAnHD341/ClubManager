@@ -7,38 +7,81 @@ using System.Windows.Media.Imaging;
 
 namespace ClubManager.Services
 {
-    /// <summary>
-    /// Generador de códigos de barras funcionales sin dependencias externas
-    /// Implementa Code128 y Code39 con algoritmos reales
-    /// </summary>
     public static class BarcodeGenerator
     {
-        /// <summary>
-        /// Genera una imagen de código de barras
-        /// </summary>
-        /// <param name="text">Texto a codificar</param>
-        /// <param name="width">Ancho de la imagen</param>
-        /// <param name="height">Alto de la imagen</param>
-        /// <param name="type">Tipo de código (Code128, Code39)</param>
-        /// <returns>Imagen bitmap del código de barras</returns>
-        public static BitmapSource? GenerateBarcode(string text, double width, double height, string type = "Code128")
+        public static BitmapSource? GenerateBarcode(string data, double width, double height, string format = "Code128")
         {
             try
             {
-                if (string.IsNullOrEmpty(text))
+                if (string.IsNullOrWhiteSpace(data))
                     return null;
 
-                string pattern = type.ToUpper() switch
+                // Crear una imagen bitmap con fondo transparente para evitar marcos
+                var pixelWidth = (int)Math.Max(width, 200);
+                var pixelHeight = (int)Math.Max(height, 60);
+
+                var bitmap = new WriteableBitmap(pixelWidth, pixelHeight, 96, 96, PixelFormats.Bgra32, null);
+
+                var stride = pixelWidth * 4; // 4 bytes por pixel (BGRA)
+                var pixelData = new byte[stride * pixelHeight];
+
+                // Llenar con transparente (todos los bytes en 0)
+                Array.Clear(pixelData, 0, pixelData.Length);
+
+                // Generar patrón según el formato especificado
+                string barcodePattern = format.ToUpper() switch
                 {
-                    "CODE128" => GenerateCode128Pattern(text),
-                    "CODE39" => GenerateCode39Pattern(text),
-                    _ => GenerateCode128Pattern(text) // Default to Code128
+                    "CODE128" => GenerateCode128Pattern(data),
+                    "CODE39" => GenerateCode39Pattern(data),
+                    "EAN13" => GenerateEAN13Pattern(data),
+                    _ => GenerateCode128Pattern(data)
                 };
 
-                if (string.IsNullOrEmpty(pattern))
+                if (string.IsNullOrEmpty(barcodePattern))
                     return null;
 
-                return CreateBarcodeImage(pattern, width, height);
+                // Calcular dimensiones óptimas
+                var barWidth = Math.Max(1, pixelWidth / barcodePattern.Length);
+                var totalBarcodeWidth = barcodePattern.Length * barWidth;
+                var startX = Math.Max(0, (pixelWidth - totalBarcodeWidth) / 2);
+
+                // Usar toda la altura disponible (sin márgenes internos)
+                var barHeight = pixelHeight;
+                var startY = 0;
+
+                // Dibujar las barras negras
+                for (int patternIndex = 0; patternIndex < barcodePattern.Length; patternIndex++)
+                {
+                    if (barcodePattern[patternIndex] == '1') // Barra negra
+                    {
+                        var barStartX = startX + (patternIndex * barWidth);
+                        var barEndX = Math.Min(barStartX + barWidth, pixelWidth);
+
+                        for (int x = barStartX; x < barEndX; x++)
+                        {
+                            for (int y = startY; y < startY + barHeight; y++)
+                            {
+                                if (x >= 0 && x < pixelWidth && y >= 0 && y < pixelHeight)
+                                {
+                                    var index = (y * stride) + (x * 4);
+                                    if (index + 3 < pixelData.Length)
+                                    {
+                                        pixelData[index] = 0;     // B
+                                        pixelData[index + 1] = 0; // G
+                                        pixelData[index + 2] = 0; // R
+                                        pixelData[index + 3] = 255; // A (opaco)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Escribir los datos al bitmap
+                var rect = new Int32Rect(0, 0, pixelWidth, pixelHeight);
+                bitmap.WritePixels(rect, pixelData, stride, 0);
+
+                return bitmap;
             }
             catch (Exception ex)
             {
@@ -47,168 +90,92 @@ namespace ClubManager.Services
             }
         }
 
-        /// <summary>
-        /// Genera el patrón binario para Code128
-        /// </summary>
-        private static string GenerateCode128Pattern(string text)
+        private static readonly Dictionary<char, string> Code128TableB = new Dictionary<char, string>
         {
-            try
-            {
-                var pattern = "";
-                var checksum = 104; // Start Code B
-
-                // Start pattern for Code B
-                pattern += Code128Patterns[104];
-
-                // Encode each character
-                for (int i = 0; i < text.Length; i++)
-                {
-                    var charCode = GetCode128Value(text[i]);
-                    if (charCode == -1) continue; // Skip invalid characters
-
-                    pattern += Code128Patterns[charCode];
-                    checksum += charCode * (i + 1);
-                }
-
-                // Add checksum
-                var checksumValue = checksum % 103;
-                pattern += Code128Patterns[checksumValue];
-
-                // Stop pattern
-                pattern += "1100011101011"; // Stop pattern
-
-                return pattern;
-            }
-            catch
-            {
-                return "";
-            }
-        }
-
-        /// <summary>
-        /// Genera el patrón binario para Code39
-        /// </summary>
-        private static string GenerateCode39Pattern(string text)
-        {
-            try
-            {
-                var pattern = "";
-
-                // Start character (*)
-                pattern += "100010111011101";
-
-                // Encode each character
-                foreach (char c in text.ToUpper())
-                {
-                    if (Code39Patterns.ContainsKey(c))
-                    {
-                        pattern += Code39Patterns[c];
-                        pattern += "0"; // Inter-character gap
-                    }
-                }
-
-                // Stop character (*)
-                pattern += "100010111011101";
-
-                return pattern;
-            }
-            catch
-            {
-                return "";
-            }
-        }
-
-        /// <summary>
-        /// Crea la imagen bitmap del código de barras
-        /// </summary>
-        private static BitmapSource CreateBarcodeImage(string pattern, double width, double height)
-        {
-            try
-            {
-                var drawingVisual = new DrawingVisual();
-                using (var context = drawingVisual.RenderOpen())
-                {
-                    // Fondo blanco
-                    context.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
-
-                    // Calcular ancho de cada barra
-                    var barWidth = width / pattern.Length;
-                    var barHeight = height * 0.8; // 80% de la altura para las barras
-                    var startY = height * 0.1; // 10% de margen superior
-
-                    // Dibujar las barras
-                    for (int i = 0; i < pattern.Length; i++)
-                    {
-                        if (pattern[i] == '1')
-                        {
-                            var x = i * barWidth;
-                            context.DrawRectangle(Brushes.Black, null,
-                                new Rect(x, startY, barWidth, barHeight));
-                        }
-                    }
-                }
-
-                var bitmap = new RenderTargetBitmap((int)width, (int)height, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(drawingVisual);
-                return bitmap;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Obtiene el valor Code128 para un carácter
-        /// </summary>
-        private static int GetCode128Value(char c)
-        {
-            if (c >= ' ' && c <= '_')
-                return c - ' ';
-            return -1; // Invalid character
-        }
-
-        /// <summary>
-        /// Patrones Code128 (103 valores + start/stop)
-        /// Cada patrón representa las barras y espacios en binario
-        /// </summary>
-        private static readonly Dictionary<int, string> Code128Patterns = new()
-        {
-            {0, "11011001100"},   {1, "11001101100"},   {2, "11001100110"},   {3, "10010011000"},
-            {4, "10010001100"},   {5, "10001001100"},   {6, "10011001000"},   {7, "10011000100"},
-            {8, "10001100100"},   {9, "11001001000"},   {10, "11001000100"},  {11, "11000100100"},
-            {12, "10110011100"},  {13, "10011011100"},  {14, "10011001110"},  {15, "10111001100"},
-            {16, "10011101100"},  {17, "10011100110"},  {18, "11001110010"},  {19, "11001011100"},
-            {20, "11001001110"},  {21, "11011100100"},  {22, "11001110100"},  {23, "11101101110"},
-            {24, "11101001100"},  {25, "11100101100"},  {26, "11100100110"},  {27, "11101100100"},
-            {28, "11100110100"},  {29, "11100110010"},  {30, "11011011000"},  {31, "11011000110"},
-            {32, "11000110110"},  {33, "10100011000"},  {34, "10001011000"},  {35, "10001000110"},
-            {36, "10110001000"},  {37, "10001101000"},  {38, "10001100010"},  {39, "11010001000"},
-            {40, "11000101000"},  {41, "11000100010"},  {42, "10110111000"},  {43, "10110001110"},
-            {44, "10001101110"},  {45, "10111011000"},  {46, "10111000110"},  {47, "10001110110"},
-            {48, "11101110110"},  {49, "11010001110"},  {50, "11000101110"},  {51, "11011101000"},
-            {52, "11011100010"},  {53, "11011101110"},  {54, "11101011000"},  {55, "11101000110"},
-            {56, "11100010110"},  {57, "11101101000"},  {58, "11101100010"},  {59, "11100011010"},
-            {60, "11101111010"},  {61, "11001000010"},  {62, "11110001010"},  {63, "10100110000"},
-            {64, "10100001100"},  {65, "10010110000"},  {66, "10010000110"},  {67, "10000101100"},
-            {68, "10000100110"},  {69, "10110010000"},  {70, "10110000100"},  {71, "10011010000"},
-            {72, "10011000010"},  {73, "10000110100"},  {74, "10000110010"},  {75, "11000010010"},
-            {76, "11001010000"},  {77, "11110111010"},  {78, "11000010100"},  {79, "10001111010"},
-            {80, "10100111100"},  {81, "10010111100"},  {82, "10010011110"},  {83, "10111100100"},
-            {84, "10011110100"},  {85, "10011110010"},  {86, "11110100100"},  {87, "11110010100"},
-            {88, "11110010010"},  {89, "11011011110"},  {90, "11011110110"},  {91, "11110110110"},
-            {92, "10101111000"},  {93, "10100011110"},  {94, "10001011110"},  {95, "10111101000"},
-            {96, "10111100010"},  {97, "11110101000"},  {98, "11110100010"},  {99, "10111011110"},
-            {100, "10111101110"}, {101, "11101011110"}, {102, "11110101110"}, {103, "11010000100"},
-            {104, "11010010000"}, {105, "11010011100"}, {106, "1100011101011"} // Stop
+            {' ', "11011001100"}, {'!', "11001101100"}, {'"', "11001100110"}, {'#', "10010011000"},
+            {'$', "10010001100"}, {'%', "10001001100"}, {'&', "10011001000"}, {'\'', "10011000100"},
+            {'(', "10001100100"}, {')', "11001001000"}, {'*', "11001000100"}, {'+', "11000100100"},
+            {',', "10110011100"}, {'-', "10011011100"}, {'.', "10011001110"}, {'/', "10111001100"},
+            {'0', "10011101100"}, {'1', "10011100110"}, {'2', "11001110010"}, {'3', "11001011100"},
+            {'4', "11001001110"}, {'5', "11011100100"}, {'6', "11001110100"}, {'7', "11101101110"},
+            {'8', "11101001100"}, {'9', "11100101100"}, {':', "11100100110"}, {';', "11101100100"},
+            {'<', "11100110100"}, {'=', "11100110010"}, {'>', "11011011000"}, {'?', "11011000110"},
+            {'@', "11000110110"}, {'A', "10100011000"}, {'B', "10001011000"}, {'C', "10001000110"},
+            {'D', "10110001000"}, {'E', "10001101000"}, {'F', "10001100010"}, {'G', "11010001000"},
+            {'H', "11000101000"}, {'I', "11000100010"}, {'J', "10110111000"}, {'K', "10110001110"},
+            {'L', "10001101110"}, {'M', "10111011000"}, {'N', "10111000110"}, {'O', "10001110110"},
+            {'P', "11101110110"}, {'Q', "11010001110"}, {'R', "11000101110"}, {'S', "11011101000"},
+            {'T', "11011100010"}, {'U', "11011101110"}, {'V', "11101011000"}, {'W', "11101000110"},
+            {'X', "11100010110"}, {'Y', "11101101000"}, {'Z', "11101100010"}, {'[', "11100011010"},
+            {'\\', "11101111010"}, {']', "11001000010"}, {'^', "11110001010"}, {'_', "10100110000"},
+            {'`', "10100001100"}, {'a', "10010110000"}, {'b', "10010000110"}, {'c', "10000101100"},
+            {'d', "10000100110"}, {'e', "10110010000"}, {'f', "10110000100"}, {'g', "10011010000"},
+            {'h', "10011000010"}, {'i', "10000110100"}, {'j', "10000110010"}, {'k', "11000010010"},
+            {'l', "11001010000"}, {'m', "11110111010"}, {'n', "11000010100"}, {'o', "10001111010"},
+            {'p', "10100111100"}, {'q', "10010111100"}, {'r', "10010011110"}, {'s', "10111100100"},
+            {'t', "10011110100"}, {'u', "10011110010"}, {'v', "11110100100"}, {'w', "11110010100"},
+            {'x', "11110010010"}, {'y', "11011011110"}, {'z', "11011110110"}, {'{', "11110110110"},
+            {'|', "10101111000"}, {'}', "10100011110"}, {'~', "10001011110"}
         };
 
-        /// <summary>
-        /// Patrones Code39
-        /// Cada carácter se representa con 9 elementos (5 barras, 4 espacios)
-        /// 3 elementos son anchos, 6 son estrechos
-        /// </summary>
-        private static readonly Dictionary<char, string> Code39Patterns = new()
+        private static string GenerateCode128Pattern(string data)
+        {
+            try
+            {
+                var pattern = "";
+
+                // Start B (para caracteres ASCII)
+                pattern += "11010010000";
+
+                var checksum = 104; // Start B value
+
+                for (int i = 0; i < data.Length; i++)
+                {
+                    char c = data[i];
+
+                    if (Code128TableB.ContainsKey(c))
+                    {
+                        pattern += Code128TableB[c];
+                        // Calcular checksum
+                        var value = c == ' ' ? 0 : (c >= '!' && c <= '~') ? (c - 32) : 0;
+                        checksum += value * (i + 1);
+                    }
+                    else
+                    {
+                        // Si el caracter no está en la tabla, usar '?'
+                        pattern += Code128TableB['?'];
+                        checksum += 31 * (i + 1); // Value for '?'
+                    }
+                }
+
+                // Agregar checksum
+                checksum = checksum % 103;
+                var checksumChar = GetCode128Character(checksum);
+                if (Code128TableB.ContainsKey(checksumChar))
+                {
+                    pattern += Code128TableB[checksumChar];
+                }
+
+                // Stop pattern
+                pattern += "1100011101011";
+
+                return pattern;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en Code128: {ex.Message}");
+                return "";
+            }
+        }
+
+        private static char GetCode128Character(int value)
+        {
+            if (value == 0) return ' ';
+            if (value >= 1 && value <= 94) return (char)(value + 31);
+            return '?';
+        }
+
+        private static readonly Dictionary<char, string> Code39Table = new Dictionary<char, string>
         {
             {'0', "101001101101"}, {'1', "110100101011"}, {'2', "101100101011"}, {'3', "110110010101"},
             {'4', "101001101011"}, {'5', "110100110101"}, {'6', "101100110101"}, {'7', "101001011011"},
@@ -223,137 +190,232 @@ namespace ClubManager.Services
             {'/', "100100101001"}, {'+', "100101001001"}, {'%', "101001001001"}, {'*', "100101101101"}
         };
 
-        /// <summary>
-        /// Valida si un texto es válido para Code128
-        /// </summary>
-        public static bool IsValidCode128(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return false;
-
-            return text.All(c => c >= ' ' && c <= '_');
-        }
-
-        /// <summary>
-        /// Valida si un texto es válido para Code39
-        /// </summary>
-        public static bool IsValidCode39(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return false;
-
-            return text.ToUpper().All(c => Code39Patterns.ContainsKey(c));
-        }
-
-        /// <summary>
-        /// Genera un código de barras simple basado en patrones hash (fallback)
-        /// </summary>
-        public static BitmapSource GenerateSimpleBarcode(string text, double width, double height)
+        private static string GenerateCode39Pattern(string data)
         {
             try
             {
-                var drawingVisual = new DrawingVisual();
-                using (var context = drawingVisual.RenderOpen())
+                var pattern = "";
+                var upperData = data.ToUpper();
+
+                // Start/Stop character (*)
+                pattern += Code39Table['*'];
+                pattern += "0"; // Espacio entre caracteres
+
+                foreach (char c in upperData)
                 {
-                    // Fondo blanco
-                    context.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
-
-                    // Generar patrón simple basado en hash del texto
-                    var hash = text.GetHashCode();
-                    var pattern = Convert.ToString(Math.Abs(hash), 2).PadLeft(32, '0');
-
-                    // Repetir patrón para llenar el ancho disponible
-                    var fullPattern = "";
-                    var targetLength = (int)(width / 2); // 2 píxeles por bit
-                    while (fullPattern.Length < targetLength)
+                    if (Code39Table.ContainsKey(c))
                     {
-                        fullPattern += pattern;
+                        pattern += Code39Table[c];
+                        pattern += "0"; // Espacio entre caracteres
                     }
-                    fullPattern = fullPattern.Substring(0, targetLength);
-
-                    // Dibujar barras
-                    var barWidth = width / fullPattern.Length;
-                    var barHeight = height * 0.7;
-                    var startY = height * 0.15;
-
-                    for (int i = 0; i < fullPattern.Length; i++)
+                    else if (char.IsLetterOrDigit(c) || c == '-' || c == '.' || c == ' ')
                     {
-                        if (fullPattern[i] == '1')
-                        {
-                            var x = i * barWidth;
-                            context.DrawRectangle(Brushes.Black, null,
-                                new Rect(x, startY, barWidth, barHeight));
-                        }
+                        // Si no está en la tabla pero es válido, usar un placeholder
+                        pattern += Code39Table['*'];
+                        pattern += "0";
                     }
                 }
 
-                var bitmap = new RenderTargetBitmap((int)width, (int)height, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(drawingVisual);
-                return bitmap;
+                // Stop character (*)
+                pattern += Code39Table['*'];
+
+                return pattern;
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                System.Diagnostics.Debug.WriteLine($"Error en Code39: {ex.Message}");
+                return "";
             }
         }
 
-        /// <summary>
-        /// Genera un código QR simple (representación visual básica)
-        /// </summary>
-        public static BitmapSource GenerateSimpleQR(string text, double size)
+        private static string GenerateEAN13Pattern(string data)
         {
             try
             {
-                var drawingVisual = new DrawingVisual();
-                using (var context = drawingVisual.RenderOpen())
+                // Asegurar que tenemos exactamente 13 dígitos
+                var ean13Data = data.PadLeft(13, '0');
+                if (ean13Data.Length > 13)
+                    ean13Data = ean13Data.Substring(ean13Data.Length - 13);
+
+                // Verificar que todos son dígitos
+                if (!ean13Data.All(char.IsDigit))
+                    return "";
+
+                var pattern = "101"; // Start guard
+
+                var firstDigit = int.Parse(ean13Data[0].ToString());
+                var leftPatternType = GetEAN13LeftPatternType(firstDigit);
+
+                // Primeros 6 dígitos (usando patrón L o G según el primer dígito)
+                for (int i = 1; i <= 6; i++)
                 {
-                    // Fondo blanco
-                    context.DrawRectangle(Brushes.White, null, new Rect(0, 0, size, size));
+                    var digit = int.Parse(ean13Data[i].ToString());
+                    if (leftPatternType[i - 1] == 'L')
+                        pattern += GetEAN13LeftPattern(digit);
+                    else
+                        pattern += GetEAN13GPattern(digit);
+                }
 
-                    // Generar patrón QR simple basado en hash
-                    var hash = text.GetHashCode();
-                    var gridSize = 21; // QR estándar 21x21
-                    var cellSize = size / gridSize;
+                pattern += "01010"; // Center guard
 
-                    var random = new Random(Math.Abs(hash));
+                // Últimos 6 dígitos (usando patrón R)
+                for (int i = 7; i <= 12; i++)
+                {
+                    var digit = int.Parse(ean13Data[i].ToString());
+                    pattern += GetEAN13RightPattern(digit);
+                }
 
-                    // Dibujar patrón de localización (esquinas)
-                    DrawFinderPattern(context, 0, 0, cellSize);
-                    DrawFinderPattern(context, (gridSize - 7) * cellSize, 0, cellSize);
-                    DrawFinderPattern(context, 0, (gridSize - 7) * cellSize, cellSize);
+                pattern += "101"; // End guard
+                return pattern;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error en EAN13: {ex.Message}");
+                return "";
+            }
+        }
 
-                    // Llenar con patrón aleatorio basado en hash
-                    for (int x = 0; x < gridSize; x++)
+        private static string GetEAN13LeftPatternType(int firstDigit)
+        {
+            var patterns = new string[]
+            {
+                "LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG",
+                "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"
+            };
+            return firstDigit < patterns.Length ? patterns[firstDigit] : patterns[0];
+        }
+
+        private static string GetEAN13LeftPattern(int digit)
+        {
+            var leftPatterns = new string[]
+            {
+                "0001101", "0011001", "0010011", "0111101", "0100011",
+                "0110001", "0101111", "0111011", "0110111", "0001011"
+            };
+            return digit < leftPatterns.Length ? leftPatterns[digit] : leftPatterns[0];
+        }
+
+        private static string GetEAN13GPattern(int digit)
+        {
+            var gPatterns = new string[]
+            {
+                "0100111", "0110011", "0011011", "0100001", "0011101",
+                "0111001", "0000101", "0010001", "0001001", "0010111"
+            };
+            return digit < gPatterns.Length ? gPatterns[digit] : gPatterns[0];
+        }
+
+        private static string GetEAN13RightPattern(int digit)
+        {
+            var rightPatterns = new string[]
+            {
+                "1110010", "1100110", "1101100", "1000010", "1011100",
+                "1001110", "1010000", "1000100", "1001000", "1110100"
+            };
+            return digit < rightPatterns.Length ? rightPatterns[digit] : rightPatterns[0];
+        }
+
+        public static BitmapSource? GenerateQRCode(string data, double size)
+        {
+            try
+            {
+                // QR Code mejorado con fondo transparente
+                var pixelSize = (int)Math.Max(size, 100);
+                var moduleSize = Math.Max(2, pixelSize / 25);
+
+                var bitmap = new WriteableBitmap(pixelSize, pixelSize, 96, 96, PixelFormats.Bgra32, null);
+                var stride = pixelSize * 4;
+                var pixelData = new byte[stride * pixelSize];
+
+                // Fondo transparente
+                Array.Clear(pixelData, 0, pixelData.Length);
+
+                // Generar patrón QR mejorado
+                var hash = data.GetHashCode();
+                var random = new Random(Math.Abs(hash));
+
+                // Dibujar módulos QR
+                for (int moduleY = 0; moduleY < 25; moduleY++)
+                {
+                    for (int moduleX = 0; moduleX < 25; moduleX++)
                     {
-                        for (int y = 0; y < gridSize; y++)
-                        {
-                            // Evitar zonas de patrones de localización
-                            if (IsInFinderPattern(x, y, gridSize))
-                                continue;
+                        // Patrones de localización más precisos
+                        bool isFinderPattern = IsInFinderPattern(moduleX, moduleY);
+                        bool isTimingPattern = IsTimingPattern(moduleX, moduleY);
 
-                            if (random.NextDouble() > 0.5)
+                        bool isBlack;
+                        if (isFinderPattern)
+                        {
+                            isBlack = IsFinderPatternBlack(moduleX % 7, moduleY % 7);
+                        }
+                        else if (isTimingPattern)
+                        {
+                            isBlack = (moduleX + moduleY) % 2 == 0;
+                        }
+                        else
+                        {
+                            // Área de datos con patrón pseudo-aleatorio mejorado
+                            var seed = (moduleX * 31 + moduleY * 17 + Math.Abs(hash)) % 1000;
+                            isBlack = new Random(seed).Next(0, 5) == 1; // 20% de densidad
+                        }
+
+                        if (isBlack)
+                        {
+                            var startX = moduleX * moduleSize;
+                            var startY = moduleY * moduleSize;
+                            var endX = Math.Min(startX + moduleSize, pixelSize);
+                            var endY = Math.Min(startY + moduleSize, pixelSize);
+
+                            for (int y = startY; y < endY; y++)
                             {
-                                context.DrawRectangle(Brushes.Black, null,
-                                    new Rect(x * cellSize, y * cellSize, cellSize, cellSize));
+                                for (int x = startX; x < endX; x++)
+                                {
+                                    if (x >= 0 && x < pixelSize && y >= 0 && y < pixelSize)
+                                    {
+                                        var index = (y * stride) + (x * 4);
+                                        if (index + 3 < pixelData.Length)
+                                        {
+                                            pixelData[index] = 0;     // B
+                                            pixelData[index + 1] = 0; // G
+                                            pixelData[index + 2] = 0; // R
+                                            pixelData[index + 3] = 255; // A
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                var bitmap = new RenderTargetBitmap((int)size, (int)size, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(drawingVisual);
+                var rect = new Int32Rect(0, 0, pixelSize, pixelSize);
+                bitmap.WritePixels(rect, pixelData, stride, 0);
+
                 return bitmap;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error generando QR: {ex.Message}");
                 return null;
             }
         }
 
-        private static void DrawFinderPattern(DrawingContext context, double x, double y, double cellSize)
+        private static bool IsInFinderPattern(int x, int y)
         {
-            // Patrón de localización QR (7x7)
-            var pattern = new bool[7, 7]
+            return (x < 7 && y < 7) ||           // Top-left
+                   (x >= 18 && y < 7) ||         // Top-right  
+                   (x < 7 && y >= 18);           // Bottom-left
+        }
+
+        private static bool IsTimingPattern(int x, int y)
+        {
+            return (x == 6 && y >= 8 && y <= 16) || // Vertical timing
+                   (y == 6 && x >= 8 && x <= 16);   // Horizontal timing
+        }
+
+        private static bool IsFinderPatternBlack(int x, int y)
+        {
+            // Patrón típico de localización QR (7x7)
+            var pattern = new bool[,]
             {
                 {true, true, true, true, true, true, true},
                 {true, false, false, false, false, false, true},
@@ -364,25 +426,7 @@ namespace ClubManager.Services
                 {true, true, true, true, true, true, true}
             };
 
-            for (int i = 0; i < 7; i++)
-            {
-                for (int j = 0; j < 7; j++)
-                {
-                    if (pattern[i, j])
-                    {
-                        context.DrawRectangle(Brushes.Black, null,
-                            new Rect(x + j * cellSize, y + i * cellSize, cellSize, cellSize));
-                    }
-                }
-            }
-        }
-
-        private static bool IsInFinderPattern(int x, int y, int gridSize)
-        {
-            // Verificar si está en zona de patrón de localización
-            return (x < 9 && y < 9) ||  // Top-left
-                   (x >= gridSize - 8 && y < 9) ||  // Top-right
-                   (x < 9 && y >= gridSize - 8);  // Bottom-left
+            return x < 7 && y < 7 ? pattern[y, x] : false;
         }
     }
 }
