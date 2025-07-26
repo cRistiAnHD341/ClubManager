@@ -37,7 +37,8 @@
                                Style="{StaticResource RequiredLabel}"/>
                         <TextBox x:Name="NombreTextBox"
                                  Text="{Binding Nombre, UpdateSourceTrigger=PropertyChanged}" 
-                                 FontSize="14" Height="35" Padding="8"
+                                 Style="{StaticResource ModernTextBox}"
+                                 FontSize="14" Height="35"
                                  Background="{DynamicResource TextBoxBackgroundBrush}"
                                  Foreground="{DynamicResource TextBoxForegroundBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
@@ -60,6 +61,7 @@
                                Style="{StaticResource ModernLabel}"
                                Margin="0,15,0,0"/>
                         <TextBox x:Name="DescripcionTextBox"
+                                 Style="{StaticResource ModernTextBox}"
                                  Text="{Binding Descripcion, UpdateSourceTrigger=PropertyChanged}" 
                                  FontSize="14" Height="80" Padding="8"
                                  Background="{DynamicResource TextBoxBackgroundBrush}"
@@ -87,7 +89,8 @@
                                Margin="0,15,0,0"/>
                         <TextBox x:Name="PrecioTextBox"
                                  Text="{Binding Precio, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}" 
-                                 FontSize="14" Height="35" Padding="8"
+                                 Style="{StaticResource ModernTextBox}"
+                                 FontSize="14" Height="35"
                                  Background="{DynamicResource TextBoxBackgroundBrush}"
                                  Foreground="{DynamicResource TextBoxForegroundBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"

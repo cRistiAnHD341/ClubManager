@@ -1175,7 +1175,7 @@ namespace ClubManager.ViewModels
             System.Diagnostics.Debug.WriteLine($"ERROR: {mensaje}");
         }
 
-        public string ObtenerValorCampo(string campo)
+        private string ObtenerValorCampo(string campo)
         {
             var abonadoActual = AbonadoSeleccionado ?? AbonadoEjemplo;
             if (abonadoActual == null) return $"{{{campo}}}";

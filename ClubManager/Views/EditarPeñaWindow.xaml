@@ -33,9 +33,9 @@
                            Style="{StaticResource ModernLabel}"/>
                     <TextBox x:Name="NombreTextBox"
                              Text="{Binding Nombre, UpdateSourceTrigger=PropertyChanged, Delay=0}" 
+                             Style="{StaticResource ModernTextBox}"
                              FontSize="14"
                              Height="35"
-                             Padding="8"
                              Background="{DynamicResource TextBoxBackgroundBrush}"
                              Foreground="{DynamicResource TextBoxForegroundBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"

@@ -277,25 +277,160 @@ namespace ClubManager.Models
         public string ExpirationText => ExpirationDate?.ToString("dd/MM/yyyy HH:mm") ?? "Sin límite";
     }
 
+    /// </summary>
     public class Configuracion
     {
-        public int Id { get; set; }
-        public string NombreClub { get; set; } = "";
-        public string TemporadaActual { get; set; } = "";
+        // Clave primaria para Entity Framework
+        public int Id { get; set; } = 1;
+
+        // Información del club
+        public string NombreClub { get; set; } = "Mi Club Deportivo";
+        public string TemporadaActual { get; set; } = DateTime.Now.Year.ToString();
         public string DireccionClub { get; set; } = "";
         public string TelefonoClub { get; set; } = "";
         public string EmailClub { get; set; } = "";
         public string WebClub { get; set; } = "";
         public string LogoClub { get; set; } = "";
-        public string RutaEscudo { get; set; } = ""; // Añadido
+        public string RutaEscudo { get; set; } = "";
+
+        // Configuración del sistema
         public bool AutoBackup { get; set; } = true;
         public bool ConfirmarEliminaciones { get; set; } = true;
         public bool MostrarAyudas { get; set; } = true;
         public bool NumeracionAutomatica { get; set; } = true;
-        public string FormatoNumeroSocio { get; set; } = "simple";
+        public string FormatoNumeroSocio { get; set; } = "###000";
+
+        // NUEVA: Configuración de impresión de tarjetas
+        public ConfiguracionImpresionTarjetas ConfiguracionImpresion { get; set; } = new();
+
+        // Metadatos
         public DateTime FechaCreacion { get; set; } = DateTime.Now;
         public DateTime FechaModificacion { get; set; } = DateTime.Now;
+        public string Version { get; set; } = "1.0";
+
+        // Formatos disponibles para número de socio
+        public static List<FormatoNumeroSocioItem> FormatosDisponibles => new()
+    {
+        new FormatoNumeroSocioItem { Value = "000000", Display = "6 dígitos (001234)" },
+        new FormatoNumeroSocioItem { Value = "###000", Display = "Prefijo + 3 dígitos (ABC123)" },
+        new FormatoNumeroSocioItem { Value = "0000", Display = "4 dígitos (1234)" },
+        new FormatoNumeroSocioItem { Value = "00000", Display = "5 dígitos (01234)" }
+    };
     }
+    public class ConfiguracionImpresionTarjetas
+    {
+        // Impresora
+        public string ImpresoraPredeterminada { get; set; } = "";
+        public List<string> ImpresorasDisponibles { get; set; } = new();
+
+        // Configuración de página
+        public string TamañoPapel { get; set; } = "A4";
+        public string Orientacion { get; set; } = "Vertical"; // Vertical, Horizontal
+        public bool ImpresionColor { get; set; } = true;
+        public int Calidad { get; set; } = 300; // DPI
+
+        // Márgenes (en milímetros)
+        public double MargenSuperior { get; set; } = 10;
+        public double MargenInferior { get; set; } = 10;
+        public double MargenIzquierdo { get; set; } = 10;
+        public double MargenDerecho { get; set; } = 10;
+
+        // Distribución de tarjetas
+        public int TarjetasPorPagina { get; set; } = 10;
+        public double EspaciadoHorizontal { get; set; } = 5; // mm
+        public double EspaciadoVertical { get; set; } = 5; // mm
+        public bool AjustarTamañoAutomaticamente { get; set; } = true;
+
+        // Opciones adicionales
+        public bool MostrarBordeCorte { get; set; } = false;
+        public bool ImprimirEnDuplicado { get; set; } = false;
+        public bool MarcarComoImpresoAutomaticamente { get; set; } = true;
+        public bool MostrarVistaPrevia { get; set; } = true;
+
+        // Configuración de backup de impresión
+        public bool GuardarCopiaDigital { get; set; } = false;
+        public string RutaCopiasDigitales { get; set; } = "";
+
+        // Configuración avanzada
+        public bool UsarConfiguracionPersonalizada { get; set; } = false;
+        public string ConfiguracionPersonalizadaJson { get; set; } = "";
+
+        // Formatos de papel disponibles
+        public static List<TamañoPapelItem> TamañosPapelDisponibles => new()
+        {
+            new TamañoPapelItem { Value = "A4", Display = "A4 (210 x 297 mm)", Ancho = 210, Alto = 297 },
+            new TamañoPapelItem { Value = "A5", Display = "A5 (148 x 210 mm)", Ancho = 148, Alto = 210 },
+            new TamañoPapelItem { Value = "Letter", Display = "Carta (216 x 279 mm)", Ancho = 216, Alto = 279 },
+            new TamañoPapelItem { Value = "Legal", Display = "Legal (216 x 356 mm)", Ancho = 216, Alto = 356 },
+            new TamañoPapelItem { Value = "Tarjeta", Display = "Tarjeta (86 x 54 mm)", Ancho = 86, Alto = 54 }
+        };
+
+        // Calidades disponibles
+        public static List<CalidadImpresionItem> CalidadesDisponibles => new()
+        {
+            new CalidadImpresionItem { Value = 150, Display = "Borrador (150 DPI)" },
+            new CalidadImpresionItem { Value = 300, Display = "Normal (300 DPI)" },
+            new CalidadImpresionItem { Value = 600, Display = "Alta (600 DPI)" },
+            new CalidadImpresionItem { Value = 1200, Display = "Muy Alta (1200 DPI)" }
+        };
+    }
+
+    public class FormatoNumeroSocioItem
+    {
+        public string Value { get; set; } = "";
+        public string Display { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Item para selector de tamaño de papel
+    /// </summary>
+    public class TamañoPapelItem
+    {
+        public string Value { get; set; } = "";
+        public string Display { get; set; } = "";
+        public double Ancho { get; set; }
+        public double Alto { get; set; }
+    }
+
+    /// <summary>
+    /// Item para selector de calidad de impresión
+    /// </summary>
+    public class CalidadImpresionItem
+    {
+        public int Value { get; set; }
+        public string Display { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Configuración específica para una impresión
+    /// </summary>
+    public class ConfiguracionImpresionEspecifica
+    {
+        public string NombreImpresora { get; set; } = "";
+        public string TamañoPapel { get; set; } = "A4";
+        public bool ImpresionColor { get; set; } = true;
+        public int Calidad { get; set; } = 300;
+        public int Copias { get; set; } = 1;
+        public bool MostrarDialogoImpresion { get; set; } = true;
+        public bool GuardarCopia { get; set; } = false;
+        public string RutaCopia { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Resultado de operación de impresión
+    /// </summary>
+    public class ResultadoImpresion
+    {
+        public bool Exitoso { get; set; }
+        public string Mensaje { get; set; } = "";
+        public int TarjetasImpresas { get; set; }
+        public int TarjetasConError { get; set; }
+        public List<string> Errores { get; set; } = new();
+        public TimeSpan TiempoTranscurrido { get; set; }
+        public DateTime FechaImpresion { get; set; } = DateTime.Now;
+        public string ImpresoraUtilizada { get; set; } = "";
+    }
+
 
     public class PlantillaTarjeta
     {

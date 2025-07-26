@@ -1,7 +1,6 @@
 ﻿using ClubManager.Data;
 using ClubManager.Models;
 using ClubManager.ViewModels;
-using ClubManager.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,17 +9,12 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.IO;
-using Microsoft.Win32;
 
 namespace ClubManager.Views
 {
     public partial class CardDesignerWindow : Window
     {
-        #region Campos Privados
-
         private CardDesignerViewModel? _viewModel;
         private bool _isDragging = false;
         private bool _isResizing = false;
@@ -56,10 +50,6 @@ namespace ClubManager.Views
             BottomLeft,
             Left
         }
-
-        #endregion
-
-        #region Constructor e Inicialización
 
         public CardDesignerWindow()
         {
@@ -106,13 +96,16 @@ namespace ClubManager.Views
                 System.Diagnostics.Debug.WriteLine("Suscribiendo a PropertyChanged...");
                 _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
-                // Actualizar el canvas inicialmente
+                // Actualizar el canvas inicialmente para mostrar cualquier elemento existente
                 System.Diagnostics.Debug.WriteLine("Actualizando canvas inicial...");
                 _viewModel.ActualizarCanvas();
 
                 // Configurar eventos del canvas
                 System.Diagnostics.Debug.WriteLine("Configurando eventos del canvas...");
-                ConfigurarEventosCanvas();
+                CanvasTarjeta.MouseLeftButtonDown += Canvas_MouseLeftButtonDown;
+                CanvasTarjeta.MouseMove += Canvas_MouseMove;
+                CanvasTarjeta.MouseLeftButtonUp += Canvas_MouseLeftButtonUp;
+                CanvasTarjeta.MouseLeave += Canvas_MouseLeave;
 
                 // Configurar zoom
                 ConfigurarZoom();
@@ -134,51 +127,18 @@ namespace ClubManager.Views
             }
         }
 
-        private void ConfigurarEventosCanvas()
-        {
-            try
-            {
-                CanvasTarjeta.MouseLeftButtonDown += Canvas_MouseLeftButtonDown;
-                CanvasTarjeta.MouseMove += Canvas_MouseMove;
-                CanvasTarjeta.MouseLeftButtonUp += Canvas_MouseLeftButtonUp;
-                CanvasTarjeta.MouseLeave += Canvas_MouseLeave;
-                CanvasTarjeta.MouseRightButtonDown += Canvas_MouseRightButtonDown;
-
-                System.Diagnostics.Debug.WriteLine("Eventos del canvas configurados correctamente");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error configurando eventos del canvas: {ex.Message}");
-            }
-        }
-
         private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            try
+            if (e.PropertyName == nameof(CardDesignerViewModel.ElementoSeleccionado))
             {
-                if (e.PropertyName == nameof(CardDesignerViewModel.ElementoSeleccionado))
-                {
-                    ActualizarPanelPropiedades();
-                    MostrarHandlesRedimensionamiento();
+                ActualizarPanelPropiedades();
+                MostrarHandlesRedimensionamiento();
 
-                    var elemento = _viewModel?.ElementoSeleccionado;
-                    System.Diagnostics.Debug.WriteLine($"Elemento seleccionado cambió: {elemento?.Tipo ?? "null"}");
-                }
-                else if (e.PropertyName == nameof(CardDesignerViewModel.PlantillaActual))
-                {
-                    // Actualizar cuando cambien las dimensiones de la plantilla
-                    ActualizarCanvas();
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error en ViewModel_PropertyChanged: {ex.Message}");
+                // DEPURACIÓN: Ver qué elemento está seleccionado
+                var elemento = _viewModel?.ElementoSeleccionado;
+                System.Diagnostics.Debug.WriteLine($"Elemento seleccionado cambió: {elemento?.Tipo ?? "null"}");
             }
         }
-
-        #endregion
-
-        #region Eventos de Teclado
 
         private void CardDesignerWindow_KeyDown(object sender, KeyEventArgs e)
         {
@@ -208,14 +168,6 @@ namespace ClubManager.Views
 
                     case Key.N when Keyboard.Modifiers == ModifierKeys.Control:
                         _viewModel.NuevaPlantillaCommand.Execute(null);
-                        e.Handled = true;
-                        break;
-
-                    case Key.D when Keyboard.Modifiers == ModifierKeys.Control:
-                        if (_viewModel.ElementoSeleccionado != null)
-                        {
-                            _viewModel.DuplicarElementoCommand.Execute(null);
-                        }
                         e.Handled = true;
                         break;
 
@@ -279,23 +231,6 @@ namespace ClubManager.Views
                             e.Handled = true;
                         }
                         break;
-
-                    // Ordenar elementos
-                    case Key.PageUp:
-                        if (Keyboard.Modifiers == ModifierKeys.Control && _viewModel.ElementoSeleccionado != null)
-                        {
-                            EnviarAlFrente();
-                            e.Handled = true;
-                        }
-                        break;
-
-                    case Key.PageDown:
-                        if (Keyboard.Modifiers == ModifierKeys.Control && _viewModel.ElementoSeleccionado != null)
-                        {
-                            EnviarAtras();
-                            e.Handled = true;
-                        }
-                        break;
                 }
             }
             catch (Exception ex)
@@ -323,35 +258,12 @@ namespace ClubManager.Views
 
                 ActualizarCanvas();
                 ActualizarPropiedadesEnTiempoReal();
-                MostrarHandlesRedimensionamiento();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error moviendo elemento: {ex.Message}");
             }
         }
-
-        private void EnviarAlFrente()
-        {
-            if (_viewModel?.ElementoSeleccionado == null) return;
-
-            var maxZ = _viewModel.ElementosActuales.Max(e => e.ZIndex);
-            _viewModel.ElementoSeleccionado.ZIndex = maxZ + 1;
-            ActualizarCanvas();
-            ActualizarPanelPropiedades();
-        }
-
-        private void EnviarAtras()
-        {
-            if (_viewModel?.ElementoSeleccionado == null) return;
-
-            var minZ = _viewModel.ElementosActuales.Min(e => e.ZIndex);
-            _viewModel.ElementoSeleccionado.ZIndex = Math.Max(0, minZ - 1);
-            ActualizarCanvas();
-            ActualizarPanelPropiedades();
-        }
-
-        #endregion
 
         #region Eventos del Mouse y Canvas
 
@@ -373,7 +285,7 @@ namespace ClubManager.Views
                     return;
                 }
 
-                // Buscar elemento por posición del mouse
+                // Buscar elemento por posición del mouse directamente
                 var elementoEncontrado = EncontrarElementoPorPosicion(_lastPosition);
 
                 if (elementoEncontrado != null && _viewModel != null)
@@ -424,7 +336,6 @@ namespace ClubManager.Views
                 System.Diagnostics.Debug.WriteLine($"Error en MouseDown: {ex.Message}");
             }
         }
-
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
             try
@@ -549,78 +460,6 @@ namespace ClubManager.Views
             {
                 System.Diagnostics.Debug.WriteLine($"Error en MouseLeave: {ex.Message}");
             }
-        }
-
-        private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                // Menú contextual mejorado
-                if (_viewModel?.ElementoSeleccionado != null)
-                {
-                    var contextMenu = new ContextMenu();
-
-                    // Duplicar
-                    var duplicarItem = new MenuItem
-                    {
-                        Header = "📋 Duplicar",
-                        Command = _viewModel.DuplicarElementoCommand
-                    };
-                    contextMenu.Items.Add(duplicarItem);
-
-                    contextMenu.Items.Add(new Separator());
-
-                    // Ordenar
-                    var frenteItem = new MenuItem { Header = "⬆️ Enviar al frente" };
-                    frenteItem.Click += (s, args) => EnviarAlFrente();
-                    contextMenu.Items.Add(frenteItem);
-
-                    var atrasItem = new MenuItem { Header = "⬇️ Enviar atrás" };
-                    atrasItem.Click += (s, args) => EnviarAtras();
-                    contextMenu.Items.Add(atrasItem);
-
-                    contextMenu.Items.Add(new Separator());
-
-                    // Centrar
-                    var centrarItem = new MenuItem { Header = "🎯 Centrar elemento" };
-                    centrarItem.Click += (s, args) => CentrarElemento();
-                    contextMenu.Items.Add(centrarItem);
-
-                    contextMenu.Items.Add(new Separator());
-
-                    // Eliminar
-                    var eliminarItem = new MenuItem
-                    {
-                        Header = "🗑️ Eliminar",
-                        Command = _viewModel.EliminarElementoCommand
-                    };
-                    contextMenu.Items.Add(eliminarItem);
-
-                    contextMenu.IsOpen = true;
-                }
-                else
-                {
-                    // Resetear zoom si no hay elemento seleccionado
-                    ResetearZoom();
-                }
-
-                e.Handled = true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error en clic derecho: {ex.Message}");
-            }
-        }
-
-        private void CentrarElemento()
-        {
-            if (_viewModel?.ElementoSeleccionado == null) return;
-
-            var elem = _viewModel.ElementoSeleccionado;
-            elem.X = (_viewModel.PlantillaActual.Ancho - elem.Ancho) / 2;
-            elem.Y = (_viewModel.PlantillaActual.Alto - elem.Alto) / 2;
-            ActualizarCanvas();
-            ActualizarPanelPropiedades();
         }
 
         #endregion
@@ -844,16 +683,6 @@ namespace ClubManager.Views
                 newX = Math.Max(0, Math.Min(newX, _viewModel.PlantillaActual.Ancho - newWidth));
                 newY = Math.Max(0, Math.Min(newY, _viewModel.PlantillaActual.Alto - newHeight));
 
-                // Verificar que no se salga del canvas
-                if (newX + newWidth > _viewModel.PlantillaActual.Ancho)
-                {
-                    newWidth = _viewModel.PlantillaActual.Ancho - newX;
-                }
-                if (newY + newHeight > _viewModel.PlantillaActual.Alto)
-                {
-                    newHeight = _viewModel.PlantillaActual.Alto - newY;
-                }
-
                 // Actualizar elemento
                 elemento.X = newX;
                 elemento.Y = newY;
@@ -954,9 +783,11 @@ namespace ClubManager.Views
                 TarjetaBorder.RenderTransform = _transformGroup;
                 TarjetaBorder.RenderTransformOrigin = new Point(0.5, 0.5);
 
-                // Configurar eventos de zoom
+                // Configurar eventos de zoom para WPF
                 CanvasScrollViewer.MouseWheel += Canvas_MouseWheel;
                 CanvasScrollViewer.PreviewMouseRightButtonDown += Canvas_PreviewMouseRightButtonDown;
+
+                // Prevenir que el ScrollViewer maneje el zoom por defecto
                 CanvasScrollViewer.PreviewMouseWheel += ScrollViewer_PreviewMouseWheel;
 
                 System.Diagnostics.Debug.WriteLine("Zoom configurado correctamente");
@@ -1005,16 +836,13 @@ namespace ClubManager.Views
         {
             try
             {
-                // Click derecho para resetear zoom solo si no hay elemento seleccionado
-                if (_viewModel?.ElementoSeleccionado == null)
-                {
-                    ResetearZoom();
-                    e.Handled = true;
-                }
+                // Click derecho para resetear zoom
+                ResetearZoom();
+                e.Handled = true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error en clic derecho zoom: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error en clic derecho: {ex.Message}");
             }
         }
 
@@ -1026,7 +854,7 @@ namespace ClubManager.Views
 
                 if (Math.Abs(nuevoZoom - _zoomFactor) < 0.01) return;
 
-                // Aplicar zoom directo
+                // Aplicar zoom directo sin cálculos complejos
                 _scaleTransform!.ScaleX = nuevoZoom;
                 _scaleTransform.ScaleY = nuevoZoom;
 
@@ -1155,6 +983,8 @@ namespace ClubManager.Views
                 if (_viewModel?.ElementosActuales == null) return null;
 
                 // Buscar por el UIElement directamente y por posición
+
+                // Primero intentar buscar por referencia directa del UIElement
                 foreach (var elemento in _viewModel.ElementosActuales)
                 {
                     var elementoUI = EncontrarUIElementoPorElemento(elemento);
@@ -1179,6 +1009,7 @@ namespace ClubManager.Views
                     }
                 }
 
+                // Último intento: buscar por posición del mouse en el canvas
                 return EncontrarElementoPorPosicion(Mouse.GetPosition(CanvasTarjeta));
             }
             catch
@@ -1224,11 +1055,10 @@ namespace ClubManager.Views
             {
                 if (_viewModel?.ElementosActuales == null) return null;
 
-                // Buscar el elemento que contiene la posición del mouse (por Z-Index descendente)
+                // Buscar el elemento que contiene la posición del mouse
                 foreach (var elemento in _viewModel.ElementosActuales.OrderByDescending(e => e.ZIndex))
                 {
-                    if (elemento.Visible &&
-                        posicion.X >= elemento.X && posicion.X <= elemento.X + elemento.Ancho &&
+                    if (posicion.X >= elemento.X && posicion.X <= elemento.X + elemento.Ancho &&
                         posicion.Y >= elemento.Y && posicion.Y <= elemento.Y + elemento.Alto)
                     {
                         return elemento;
@@ -1265,7 +1095,7 @@ namespace ClubManager.Views
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== ACTUALIZANDO PANEL DE PROPIEDADES MEJORADO ===");
+                System.Diagnostics.Debug.WriteLine("=== ACTUALIZANDO PANEL DE PROPIEDADES ===");
 
                 if (PropiedadesPanel == null)
                 {
@@ -1277,26 +1107,27 @@ namespace ClubManager.Views
 
                 if (_viewModel?.ElementoSeleccionado == null)
                 {
-                    MostrarPanelSinSeleccion();
+                    System.Diagnostics.Debug.WriteLine("No hay elemento seleccionado - mostrando mensaje por defecto");
+
+                    var sinSeleccion = new TextBlock
+                    {
+                        Text = "Selecciona un elemento para ver sus propiedades",
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = Brushes.Gray,
+                        FontSize = 14,
+                        Margin = new Thickness(0, 10, 0, 10)
+                    };
+                    PropiedadesPanel.Children.Add(sinSeleccion);
                     return;
                 }
 
                 var elemento = _viewModel.ElementoSeleccionado;
-                System.Diagnostics.Debug.WriteLine($"Creando propiedades para: {elemento.Tipo}");
+                System.Diagnostics.Debug.WriteLine($"Creando propiedades para elemento: {elemento.Tipo}");
 
-                // Título con icono según tipo
-                var icono = elemento.Tipo switch
-                {
-                    "Texto" => "📝",
-                    "Imagen" => "🖼️",
-                    "Código de Barras" => "📊",
-                    "Campo Dinámico" => "🏷️",
-                    _ => "📄"
-                };
-
+                // Título del elemento
                 var titulo = new TextBlock
                 {
-                    Text = $"{icono} {elemento.Tipo}",
+                    Text = $"📝 {elemento.Tipo}",
                     FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     Foreground = Brushes.DarkBlue,
@@ -1304,214 +1135,66 @@ namespace ClubManager.Views
                 };
                 PropiedadesPanel.Children.Add(titulo);
 
-                // ID del elemento (para debugging)
-                if (System.Diagnostics.Debugger.IsAttached)
-                {
-                    var idText = new TextBlock
-                    {
-                        Text = $"ID: {elemento.Id.Substring(0, 8)}...",
-                        FontSize = 9,
-                        Foreground = Brushes.LightGray,
-                        Margin = new Thickness(0, -10, 0, 10)
-                    };
-                    PropiedadesPanel.Children.Add(idText);
-                }
-
-                // Propiedades básicas (posición y tamaño)
+                // Propiedades de posición y tamaño (comunes)
                 AgregarSeccion("📍 Posición y Tamaño");
 
-                AgregarPropiedadNumerica("X:", elemento.X,
-                    (valor) => {
-                        elemento.X = Math.Max(0, Math.Min(valor, _viewModel.PlantillaActual.Ancho - elemento.Ancho));
-                        ActualizarCanvas();
-                    });
+                AgregarPropiedadNumerica("Posición X:", elemento.X,
+                    (valor) => { elemento.X = valor; ActualizarCanvas(); });
 
-                AgregarPropiedadNumerica("Y:", elemento.Y,
-                    (valor) => {
-                        elemento.Y = Math.Max(0, Math.Min(valor, _viewModel.PlantillaActual.Alto - elemento.Alto));
-                        ActualizarCanvas();
-                    });
+                AgregarPropiedadNumerica("Posición Y:", elemento.Y,
+                    (valor) => { elemento.Y = valor; ActualizarCanvas(); });
 
                 AgregarPropiedadNumerica("Ancho:", elemento.Ancho,
-                    (valor) => {
-                        elemento.Ancho = Math.Max(10, Math.Min(valor, _viewModel.PlantillaActual.Ancho - elemento.X));
-                        ActualizarCanvas();
-                    });
+                    (valor) => { elemento.Ancho = Math.Max(10, valor); ActualizarCanvas(); });
 
                 AgregarPropiedadNumerica("Alto:", elemento.Alto,
-                    (valor) => {
-                        elemento.Alto = Math.Max(10, Math.Min(valor, _viewModel.PlantillaActual.Alto - elemento.Y));
-                        ActualizarCanvas();
-                    });
+                    (valor) => { elemento.Alto = Math.Max(10, valor); ActualizarCanvas(); });
 
-                AgregarPropiedadNumerica("Orden (Z):", elemento.ZIndex,
-                    (valor) => {
-                        elemento.ZIndex = Math.Max(0, (int)valor);
-                        ActualizarCanvas();
-                    });
+                AgregarPropiedadNumerica("Z-Index:", elemento.ZIndex,
+                    (valor) => { elemento.ZIndex = (int)valor; ActualizarCanvas(); });
 
                 // Propiedades específicas por tipo
                 switch (elemento)
                 {
                     case ElementoTexto texto:
+                        System.Diagnostics.Debug.WriteLine("Agregando propiedades de texto");
                         AgregarPropiedadesTexto(texto);
                         break;
                     case ElementoImagen imagen:
+                        System.Diagnostics.Debug.WriteLine("Agregando propiedades de imagen");
                         AgregarPropiedadesImagen(imagen);
                         break;
                     case ElementoCodigoBarras codigo:
+                        System.Diagnostics.Debug.WriteLine("Agregando propiedades de código de barras");
                         AgregarPropiedadesCodigoBarras(codigo);
                         break;
                     case ElementoCampoDinamico campo:
+                        System.Diagnostics.Debug.WriteLine("Agregando propiedades de campo dinámico");
                         AgregarPropiedadesCampoDinamico(campo);
                         break;
                 }
-
-                // Propiedades avanzadas (comunes a todos)
-                AgregarPropiedadesAvanzadas(elemento);
-
-                // Validación en tiempo real
-                ValidarElementoEnTiempoReal(elemento);
 
                 System.Diagnostics.Debug.WriteLine($"Panel actualizado con {PropiedadesPanel.Children.Count} controles");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"ERROR actualizando propiedades: {ex}");
-                MostrarErrorEnPanel(ex.Message);
+
+                // Mostrar error en el panel
+                if (PropiedadesPanel != null)
+                {
+                    PropiedadesPanel.Children.Clear();
+                    var errorText = new TextBlock
+                    {
+                        Text = $"Error al cargar propiedades: {ex.Message}",
+                        Foreground = Brushes.Red,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 10, 0, 10)
+                    };
+                    PropiedadesPanel.Children.Add(errorText);
+                }
             }
         }
-
-        private void MostrarPanelSinSeleccion()
-        {
-            var sinSeleccion = new StackPanel();
-
-            sinSeleccion.Children.Add(new TextBlock
-            {
-                Text = "💡 Ningún elemento seleccionado",
-                FontWeight = FontWeights.Bold,
-                FontSize = 14,
-                Foreground = Brushes.DarkBlue,
-                Margin = new Thickness(0, 0, 0, 10)
-            });
-
-            sinSeleccion.Children.Add(new TextBlock
-            {
-                Text = "• Haz clic en cualquier elemento de la tarjeta para seleccionarlo\n" +
-                       "• Usa las herramientas del panel izquierdo para agregar elementos\n" +
-                       "• Arrastra elementos para moverlos\n" +
-                       "• Usa los cuadros azules para redimensionar",
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = Brushes.Gray,
-                FontSize = 12,
-                LineHeight = 18,
-                Margin = new Thickness(0, 0, 0, 15)
-            });
-
-            // Estadísticas de la plantilla
-            if (_viewModel?.ElementosActuales.Count > 0)
-            {
-                sinSeleccion.Children.Add(new TextBlock
-                {
-                    Text = "📊 Estadísticas de la plantilla:",
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 10, 0, 5)
-                });
-
-                var elementosPorTipo = _viewModel.ElementosActuales
-                    .GroupBy(e => e.Tipo)
-                    .Select(g => $"• {g.Key}: {g.Count()}")
-                    .ToArray();
-
-                var stats = new TextBlock
-                {
-                    Text = $"Total elementos: {_viewModel.ElementosActuales.Count}\n" +
-                           string.Join("\n", elementosPorTipo),
-                    FontSize = 11,
-                    Foreground = Brushes.DarkGray,
-                    Margin = new Thickness(0, 0, 0, 10)
-                };
-                sinSeleccion.Children.Add(stats);
-
-                // Botón para ver estadísticas completas
-                var statsBtn = new Button
-                {
-                    Content = "📈 Ver estadísticas completas",
-                    Height = 30,
-                    Margin = new Thickness(0, 5, 0, 0),
-                    Background = Brushes.LightBlue,
-                    BorderBrush = Brushes.Blue
-                };
-                statsBtn.Click += (s, e) => MostrarEstadisticasCompletas();
-                sinSeleccion.Children.Add(statsBtn);
-            }
-
-            PropiedadesPanel.Children.Add(sinSeleccion);
-        }
-
-        private void MostrarErrorEnPanel(string mensaje)
-        {
-            if (PropiedadesPanel != null)
-            {
-                PropiedadesPanel.Children.Clear();
-                var errorText = new TextBlock
-                {
-                    Text = $"❌ Error al cargar propiedades:\n{mensaje}",
-                    Foreground = Brushes.Red,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 10, 0, 10),
-                    FontSize = 11
-                };
-                PropiedadesPanel.Children.Add(errorText);
-            }
-        }
-
-        private void MostrarEstadisticasCompletas()
-        {
-            try
-            {
-                if (_viewModel == null) return;
-
-                var stats = _viewModel.ObtenerEstadisticasPlantilla();
-
-                var ventanaStats = new Window
-                {
-                    Title = "Estadísticas de la Plantilla",
-                    Width = 500,
-                    Height = 400,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Owner = this
-                };
-
-                var scrollViewer = new ScrollViewer
-                {
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    Padding = new Thickness(15)
-                };
-
-                var textBlock = new TextBlock
-                {
-                    Text = stats,
-                    FontFamily = new FontFamily("Consolas"),
-                    FontSize = 12,
-                    TextWrapping = TextWrapping.Wrap
-                };
-
-                scrollViewer.Content = textBlock;
-                ventanaStats.Content = scrollViewer;
-                ventanaStats.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error mostrando estadísticas: {ex.Message}", "Error",
-                              MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        #endregion
-
-        #region Controles de Propiedades Auxiliares
 
         private void AgregarSeccion(string titulo)
         {
@@ -1557,7 +1240,7 @@ namespace ClubManager.Views
 
                 var textBox = new TextBox
                 {
-                    Text = valor.ToString("F1"),
+                    Text = valor.ToString("F0"),
                     Background = Brushes.White,
                     Foreground = Brushes.Black,
                     BorderBrush = Brushes.Gray,
@@ -1568,24 +1251,19 @@ namespace ClubManager.Views
                     Margin = new Thickness(0, 2, 0, 8)
                 };
 
-                // Validación en tiempo real
+                // Actualización en tiempo real mientras se escribe
                 textBox.TextChanged += (s, e) =>
                 {
                     try
                     {
                         if (double.TryParse(textBox.Text, out double nuevoValor))
                         {
-                            textBox.Background = Brushes.White;
                             onChange(nuevoValor);
-                        }
-                        else
-                        {
-                            textBox.Background = Brushes.LightPink;
                         }
                     }
                     catch
                     {
-                        textBox.Background = Brushes.LightPink;
+                        // Ignorar errores durante la escritura
                     }
                 };
 
@@ -1596,20 +1274,17 @@ namespace ClubManager.Views
                         if (double.TryParse(textBox.Text, out double nuevoValor))
                         {
                             onChange(nuevoValor);
-                            textBox.Background = Brushes.White;
                         }
                         else
                         {
-                            textBox.Text = valor.ToString("F1");
-                            textBox.Background = Brushes.White;
+                            textBox.Text = valor.ToString("F0");
                         }
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show($"Valor inválido: {ex.Message}", "Error",
                                       MessageBoxButton.OK, MessageBoxImage.Warning);
-                        textBox.Text = valor.ToString("F1");
-                        textBox.Background = Brushes.White;
+                        textBox.Text = valor.ToString("F0");
                     }
                 };
 
@@ -1684,283 +1359,6 @@ namespace ClubManager.Views
             }
         }
 
-        private void AgregarCheckBox(string etiqueta, bool valorActual, Action<bool> onChange)
-        {
-            try
-            {
-                var checkBox = new CheckBox
-                {
-                    Content = etiqueta,
-                    IsChecked = valorActual,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 5, 0, 10)
-                };
-
-                checkBox.Checked += (s, e) => onChange(true);
-                checkBox.Unchecked += (s, e) => onChange(false);
-
-                PropiedadesPanel.Children.Add(checkBox);
-                System.Diagnostics.Debug.WriteLine($"CheckBox agregado: {etiqueta} = {valorActual}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error agregando checkbox: {ex.Message}");
-            }
-        }
-
-        private void AgregarSelectorColor(string etiqueta, Color colorActual, Action<Color> onChange)
-        {
-            try
-            {
-                var label = new TextBlock
-                {
-                    Text = etiqueta,
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 5, 0, 2)
-                };
-                PropiedadesPanel.Children.Add(label);
-
-                // Grid con colores predefinidos
-                var colorGrid = new UniformGrid
-                {
-                    Columns = 5,
-                    Rows = 3,
-                    Margin = new Thickness(0, 2, 0, 10)
-                };
-
-                var colores = new[] {
-                    Colors.Black, Colors.White, Colors.Red, Colors.Blue, Colors.Green,
-                    Colors.Yellow, Colors.Orange, Colors.Purple, Colors.Brown, Colors.Gray,
-                    Colors.DarkBlue, Colors.DarkRed, Colors.DarkGreen, Colors.LightBlue, Colors.LightGray
-                };
-
-                foreach (var color in colores)
-                {
-                    var colorButton = new Button
-                    {
-                        Width = 25,
-                        Height = 20,
-                        Background = new SolidColorBrush(color),
-                        BorderBrush = color == colorActual ? Brushes.DarkBlue : Brushes.Gray,
-                        BorderThickness = color == colorActual ? new Thickness(3) : new Thickness(1),
-                        Margin = new Thickness(1),
-                        ToolTip = color.ToString()
-                    };
-
-                    colorButton.Click += (s, e) =>
-                    {
-                        // Actualizar todos los botones para quitar selección
-                        foreach (Button btn in colorGrid.Children)
-                        {
-                            btn.BorderBrush = Brushes.Gray;
-                            btn.BorderThickness = new Thickness(1);
-                        }
-
-                        // Marcar el botón seleccionado
-                        colorButton.BorderBrush = Brushes.DarkBlue;
-                        colorButton.BorderThickness = new Thickness(3);
-
-                        onChange(color);
-                    };
-
-                    colorGrid.Children.Add(colorButton);
-                }
-
-                PropiedadesPanel.Children.Add(colorGrid);
-
-                System.Diagnostics.Debug.WriteLine($"Selector color agregado: {etiqueta}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error agregando selector color: {ex.Message}");
-            }
-        }
-
-        private void AgregarSelectorAlineacion(string etiqueta, TextAlignment alineacionActual, Action<TextAlignment> onChange)
-        {
-            try
-            {
-                var label = new TextBlock
-                {
-                    Text = etiqueta,
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 5, 0, 2)
-                };
-                PropiedadesPanel.Children.Add(label);
-
-                var comboBox = new ComboBox
-                {
-                    FontSize = 12,
-                    Height = 25,
-                    Margin = new Thickness(0, 2, 0, 10),
-                    Background = Brushes.White
-                };
-
-                var alineaciones = new[]
-                {
-                    new { Value = TextAlignment.Left, Display = "⬅️ Izquierda" },
-                    new { Value = TextAlignment.Center, Display = "⬅️➡️ Centro" },
-                    new { Value = TextAlignment.Right, Display = "➡️ Derecha" },
-                    new { Value = TextAlignment.Justify, Display = "↔️ Justificado" }
-                };
-
-                foreach (var alineacion in alineaciones)
-                {
-                    var item = new ComboBoxItem
-                    {
-                        Content = alineacion.Display,
-                        Tag = alineacion.Value
-                    };
-                    comboBox.Items.Add(item);
-
-                    if (alineacion.Value == alineacionActual)
-                        comboBox.SelectedItem = item;
-                }
-
-                comboBox.SelectionChanged += (s, e) =>
-                {
-                    if (comboBox.SelectedItem is ComboBoxItem item && item.Tag is TextAlignment alignment)
-                    {
-                        onChange(alignment);
-                    }
-                };
-
-                PropiedadesPanel.Children.Add(comboBox);
-                System.Diagnostics.Debug.WriteLine($"Selector alineación agregado: {etiqueta}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error agregando selector alineación: {ex.Message}");
-            }
-        }
-
-        private void ActualizarPropiedadesEnTiempoReal()
-        {
-            try
-            {
-                if (_viewModel?.ElementoSeleccionado == null) return;
-
-                // Buscar y actualizar solo los TextBox de posición sin recrear todo el panel
-                foreach (UIElement child in PropiedadesPanel.Children)
-                {
-                    if (child is TextBox textBox)
-                    {
-                        var previousChild = GetPreviousChild(textBox);
-                        if (previousChild is TextBlock label)
-                        {
-                            switch (label.Text)
-                            {
-                                case "X:":
-                                    if (textBox.Text != _viewModel.ElementoSeleccionado.X.ToString("F1"))
-                                        textBox.Text = _viewModel.ElementoSeleccionado.X.ToString("F1");
-                                    break;
-                                case "Y:":
-                                    if (textBox.Text != _viewModel.ElementoSeleccionado.Y.ToString("F1"))
-                                        textBox.Text = _viewModel.ElementoSeleccionado.Y.ToString("F1");
-                                    break;
-                                case "Ancho:":
-                                    if (textBox.Text != _viewModel.ElementoSeleccionado.Ancho.ToString("F1"))
-                                        textBox.Text = _viewModel.ElementoSeleccionado.Ancho.ToString("F1");
-                                    break;
-                                case "Alto:":
-                                    if (textBox.Text != _viewModel.ElementoSeleccionado.Alto.ToString("F1"))
-                                        textBox.Text = _viewModel.ElementoSeleccionado.Alto.ToString("F1");
-                                    break;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error actualizando propiedades en tiempo real: {ex.Message}");
-            }
-        }
-
-        private UIElement? GetPreviousChild(UIElement element)
-        {
-            var index = PropiedadesPanel.Children.IndexOf(element);
-            return index > 0 ? PropiedadesPanel.Children[index - 1] : null;
-        }
-
-        private void ValidarElementoEnTiempoReal(ElementoTarjeta elemento)
-        {
-            try
-            {
-                var problemas = new List<string>();
-
-                // Validar posición
-                if (elemento.X < 0) problemas.Add("X negativa");
-                if (elemento.Y < 0) problemas.Add("Y negativa");
-                if (elemento.X + elemento.Ancho > _viewModel?.PlantillaActual.Ancho)
-                    problemas.Add("Se sale por la derecha");
-                if (elemento.Y + elemento.Alto > _viewModel?.PlantillaActual.Alto)
-                    problemas.Add("Se sale por abajo");
-
-                // Validar tamaño
-                if (elemento.Ancho <= 0) problemas.Add("Ancho inválido");
-                if (elemento.Alto <= 0) problemas.Add("Alto inválido");
-
-                // Mostrar problemas si existen
-                if (problemas.Any())
-                {
-                    var avisoPanel = PropiedadesPanel.Children
-                        .OfType<Border>()
-                        .FirstOrDefault(b => b.Name == "AvisoValidacion");
-
-                    if (avisoPanel == null)
-                    {
-                        avisoPanel = new Border
-                        {
-                            Name = "AvisoValidacion",
-                            Background = Brushes.LightYellow,
-                            BorderBrush = Brushes.Orange,
-                            BorderThickness = new Thickness(1),
-                            CornerRadius = new CornerRadius(3),
-                            Padding = new Thickness(8),
-                            Margin = new Thickness(0, 5, 0, 10)
-                        };
-
-                        var avisoText = new TextBlock
-                        {
-                            FontSize = 10,
-                            Foreground = Brushes.DarkOrange,
-                            TextWrapping = TextWrapping.Wrap
-                        };
-
-                        avisoPanel.Child = avisoText;
-                        PropiedadesPanel.Children.Add(avisoPanel);
-                    }
-
-                    if (avisoPanel.Child is TextBlock avisoTextBlock)
-                    {
-                        avisoTextBlock.Text = $"⚠️ Problemas detectados:\n• {string.Join("\n• ", problemas)}";
-                    }
-                }
-                else
-                {
-                    // Remover aviso si no hay problemas
-                    var avisoPanel = PropiedadesPanel.Children
-                        .OfType<Border>()
-                        .FirstOrDefault(b => b.Name == "AvisoValidacion");
-
-                    if (avisoPanel != null)
-                    {
-                        PropiedadesPanel.Children.Remove(avisoPanel);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error en validación: {ex.Message}");
-            }
-        }
-
-        #endregion
-        #region Propiedades Específicas por Tipo
-
         private void AgregarPropiedadesTexto(ElementoTexto texto)
         {
             AgregarSeccion("📝 Propiedades de Texto");
@@ -1972,7 +1370,7 @@ namespace ClubManager.Views
                 (valor) => { texto.FontFamily = valor; ActualizarCanvas(); });
 
             AgregarPropiedadNumerica("Tamaño:", texto.FontSize,
-                (valor) => { texto.FontSize = Math.Max(6, Math.Min(72, valor)); ActualizarCanvas(); });
+                (valor) => { texto.FontSize = Math.Max(6, valor); ActualizarCanvas(); });
 
             // Selector de color
             AgregarSelectorColor("Color:", texto.Color,
@@ -1994,9 +1392,6 @@ namespace ClubManager.Views
 
             AgregarCheckBox("Tamaño automático:", texto.AutoSize,
                 (valor) => { texto.AutoSize = valor; ActualizarCanvas(); });
-
-            AgregarCheckBox("Ajuste de línea:", texto.WordWrap,
-                (valor) => { texto.WordWrap = valor; ActualizarCanvas(); });
         }
 
         private void AgregarPropiedadesImagen(ElementoImagen imagen)
@@ -2065,7 +1460,7 @@ namespace ClubManager.Views
         {
             AgregarSeccion("📊 Propiedades de Código de Barras");
 
-            // Campo origen con selector mejorado
+            // Campo origen
             AgregarSelectorCampo("Campo origen:", codigo.CampoOrigen,
                 (campo) => {
                     codigo.CampoOrigen = campo;
@@ -2073,7 +1468,7 @@ namespace ClubManager.Views
                     System.Diagnostics.Debug.WriteLine($"Campo origen cambiado a: {campo}");
                 });
 
-            // Tipo de código
+            // Tipo de código - MEJORADO
             var labelTipo = new TextBlock
             {
                 Text = "Tipo de código:",
@@ -2091,11 +1486,10 @@ namespace ClubManager.Views
                 Background = Brushes.White
             };
 
-            var tiposCodigo = new[] { "Code128", "Code39", "EAN13", "QRCode" };
-            foreach (var tipo in tiposCodigo)
-            {
-                tipoCombo.Items.Add(tipo);
-            }
+            tipoCombo.Items.Add("Code128");
+            tipoCombo.Items.Add("Code39");
+            tipoCombo.Items.Add("EAN13");
+            tipoCombo.Items.Add("QRCode");
             tipoCombo.SelectedItem = codigo.TipoCodigo;
 
             tipoCombo.SelectionChanged += (s, e) =>
@@ -2103,240 +1497,203 @@ namespace ClubManager.Views
                 var nuevoTipo = tipoCombo.SelectedItem?.ToString() ?? "Code128";
                 codigo.TipoCodigo = nuevoTipo;
                 ActualizarCanvas();
-                ActualizarPanelPropiedades(); // Actualizar para mostrar info específica del tipo
+                System.Diagnostics.Debug.WriteLine($"Tipo código cambiado a: {nuevoTipo}");
             };
 
             PropiedadesPanel.Children.Add(tipoCombo);
 
-            // Información sobre el tipo seleccionado
-            var infoTipo = new TextBlock
-            {
-                FontSize = 10,
-                Foreground = Brushes.Gray,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 10)
-            };
-
-            var infoTexto = codigo.TipoCodigo switch
-            {
-                "Code128" => "• Alfanumérico completo\n• Alta densidad\n• Recomendado para uso general",
-                "Code39" => "• Solo mayúsculas y números\n• Menos denso pero más robusto\n• Ampliamente compatible",
-                "EAN13" => "• Solo 13 dígitos numéricos\n• Estándar internacional\n• Para productos comerciales",
-                "QRCode" => "• Código 2D de alta capacidad\n• Admite texto, URLs, etc.\n• Legible por móviles",
-                _ => "Seleccione un tipo de código"
-            };
-
-            infoTipo.Text = infoTexto;
-            PropiedadesPanel.Children.Add(infoTipo);
-
-            // Mostrar texto
             AgregarCheckBox("Mostrar texto:", codigo.MostrarTexto,
                 (valor) => {
                     codigo.MostrarTexto = valor;
                     ActualizarCanvas();
-                    ActualizarPanelPropiedades(); // Recrear para mostrar/ocultar opciones de texto
+                    // Recrear propiedades para mostrar/ocultar opciones de texto
+                    ActualizarPanelPropiedades();
                 });
 
-            // Propiedades de texto (solo si está habilitado)
             if (codigo.MostrarTexto)
             {
                 AgregarPropiedadNumerica("Tamaño texto:", codigo.FontSize,
-                    (valor) => { codigo.FontSize = Math.Max(6, Math.Min(20, valor)); ActualizarCanvas(); });
+                    (valor) => { codigo.FontSize = Math.Max(6, valor); ActualizarCanvas(); });
 
                 AgregarSelectorColor("Color texto:", codigo.ColorTexto,
                     (color) => { codigo.ColorTexto = color; ActualizarCanvas(); });
             }
 
-            // Color de fondo con opción transparente
-            AgregarSelectorColorFondo("Color fondo:", codigo.ColorFondo,
+            AgregarSelectorColor("Color fondo:", codigo.ColorFondo,
                 (color) => { codigo.ColorFondo = color; ActualizarCanvas(); });
-
-            // Vista previa del código
-            AgregarVistaPreviewCodigo(codigo);
         }
 
         private void AgregarPropiedadesCampoDinamico(ElementoCampoDinamico campo)
         {
             AgregarSeccion("🏷️ Propiedades de Campo Dinámico");
 
-            // Campo origen con selector mejorado
+            // Campo origen
             AgregarSelectorCampo("Campo origen:", campo.CampoOrigen,
-                (valor) => {
-                    campo.CampoOrigen = valor;
-                    ActualizarCanvas();
-                    ActualizarPanelPropiedades(); // Actualizar para mostrar nueva preview
-                });
+                (valor) => { campo.CampoOrigen = valor; ActualizarCanvas(); });
 
-            // Prefijo y sufijo
             AgregarPropiedadTexto("Prefijo:", campo.Prefijo ?? "",
-                (valor) => {
-                    campo.Prefijo = valor;
-                    ActualizarCanvas();
-                });
+                (valor) => { campo.Prefijo = valor; ActualizarCanvas(); });
 
             AgregarPropiedadTexto("Sufijo:", campo.Sufijo ?? "",
-                (valor) => {
-                    campo.Sufijo = valor;
-                    ActualizarCanvas();
-                });
-
-            // Vista previa del valor
-            var labelPreview = new TextBlock
-            {
-                Text = "Vista previa:",
-                FontWeight = FontWeights.SemiBold,
-                FontSize = 12,
-                Margin = new Thickness(0, 10, 0, 5)
-            };
-            PropiedadesPanel.Children.Add(labelPreview);
-
-            var valorActual = _viewModel?.ObtenerValorCampo(campo.CampoOrigen) ?? "";
-            var textoFinal = $"{campo.Prefijo}{valorActual}{campo.Sufijo}";
-
-            var previewText = new TextBlock
-            {
-                Text = textoFinal,
-                FontSize = 11,
-                Foreground = Brushes.DarkBlue,
-                Background = Brushes.LightYellow,
-                Padding = new Thickness(5),
-                Margin = new Thickness(0, 0, 0, 10),
-                TextWrapping = TextWrapping.Wrap,
-                FontWeight = FontWeights.SemiBold
-            };
-            PropiedadesPanel.Children.Add(previewText);
-
-            // Propiedades de formato
-            AgregarSeccion("🎨 Formato del Texto");
+                (valor) => { campo.Sufijo = valor; ActualizarCanvas(); });
 
             AgregarPropiedadTexto("Fuente:", campo.FontFamily,
-                (valor) => {
-                    campo.FontFamily = valor;
-                    ActualizarCanvas();
-                });
+                (valor) => { campo.FontFamily = valor; ActualizarCanvas(); });
 
             AgregarPropiedadNumerica("Tamaño:", campo.FontSize,
-                (valor) => {
-                    campo.FontSize = Math.Max(6, Math.Min(72, valor));
-                    ActualizarCanvas();
-                });
+                (valor) => { campo.FontSize = Math.Max(6, valor); ActualizarCanvas(); });
 
             AgregarSelectorColor("Color:", campo.Color,
-                (color) => {
-                    campo.Color = color;
-                    ActualizarCanvas();
-                });
+                (color) => { campo.Color = color; ActualizarCanvas(); });
 
             AgregarSelectorAlineacion("Alineación:", campo.TextAlignment,
-                (alineacion) => {
-                    campo.TextAlignment = alineacion;
-                    ActualizarCanvas();
-                });
+                (alineacion) => { campo.TextAlignment = alineacion; ActualizarCanvas(); });
 
-            // Estilo del texto
             AgregarCheckBox("Negrita:", campo.IsBold,
-                (valor) => {
-                    campo.IsBold = valor;
-                    ActualizarCanvas();
-                });
+                (valor) => { campo.IsBold = valor; ActualizarCanvas(); });
 
             AgregarCheckBox("Cursiva:", campo.IsItalic,
-                (valor) => {
-                    campo.IsItalic = valor;
-                    ActualizarCanvas();
-                });
-        }
-
-        private void AgregarPropiedadesAvanzadas(ElementoTarjeta elemento)
-        {
-            AgregarSeccion("⚡ Propiedades Avanzadas");
-
-            // Opacidad
-            AgregarPropiedadNumerica("Opacidad (0-1):", elemento.Opacidad,
-                (valor) => {
-                    elemento.Opacidad = Math.Max(0, Math.Min(1, valor));
-                    ActualizarCanvas();
-                });
-
-            // Rotación
-            AgregarPropiedadNumerica("Rotación (grados):", elemento.Rotacion,
-                (valor) => {
-                    elemento.Rotacion = valor % 360;
-                    ActualizarCanvas();
-                });
-
-            // Visibilidad
-            AgregarCheckBox("Visible:", elemento.Visible,
-                (valor) => {
-                    elemento.Visible = valor;
-                    ActualizarCanvas();
-                });
-
-            // Botones de acción rápida
-            var accionesStack = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-
-            // Botón duplicar
-            var duplicarBtn = new Button
-            {
-                Content = "📋",
-                Width = 30,
-                Height = 25,
-                Margin = new Thickness(0, 0, 5, 0),
-                ToolTip = "Duplicar elemento",
-                FontSize = 12
-            };
-            duplicarBtn.Click += (s, e) => _viewModel?.DuplicarElementoCommand.Execute(null);
-
-            // Botón enviar al frente
-            var frenteBtn = new Button
-            {
-                Content = "⬆️",
-                Width = 30,
-                Height = 25,
-                Margin = new Thickness(0, 0, 5, 0),
-                ToolTip = "Enviar al frente",
-                FontSize = 12
-            };
-            frenteBtn.Click += (s, e) => EnviarAlFrente();
-
-            // Botón enviar atrás
-            var atrasBtn = new Button
-            {
-                Content = "⬇️",
-                Width = 30,
-                Height = 25,
-                Margin = new Thickness(0, 0, 5, 0),
-                ToolTip = "Enviar atrás",
-                FontSize = 12
-            };
-            atrasBtn.Click += (s, e) => EnviarAtras();
-
-            // Botón centrar
-            var centrarBtn = new Button
-            {
-                Content = "🎯",
-                Width = 30,
-                Height = 25,
-                ToolTip = "Centrar elemento",
-                FontSize = 12
-            };
-            centrarBtn.Click += (s, e) => CentrarElemento();
-
-            accionesStack.Children.Add(duplicarBtn);
-            accionesStack.Children.Add(frenteBtn);
-            accionesStack.Children.Add(atrasBtn);
-            accionesStack.Children.Add(centrarBtn);
-
-            PropiedadesPanel.Children.Add(accionesStack);
+                (valor) => { campo.IsItalic = valor; ActualizarCanvas(); });
         }
 
         #endregion
 
-        #region Métodos Auxiliares Específicos
+        #region Controles de Propiedades Auxiliares
+
+        private void AgregarCheckBox(string etiqueta, bool valorActual, Action<bool> onChange)
+        {
+            try
+            {
+                var checkBox = new CheckBox
+                {
+                    Content = etiqueta,
+                    IsChecked = valorActual,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 5, 0, 10)
+                };
+
+                checkBox.Checked += (s, e) => onChange(true);
+                checkBox.Unchecked += (s, e) => onChange(false);
+
+                PropiedadesPanel.Children.Add(checkBox);
+                System.Diagnostics.Debug.WriteLine($"CheckBox agregado: {etiqueta} = {valorActual}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error agregando checkbox: {ex.Message}");
+            }
+        }
+
+        private void AgregarSelectorColor(string etiqueta, Color colorActual, Action<Color> onChange)
+        {
+            try
+            {
+                var label = new TextBlock
+                {
+                    Text = etiqueta,
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 5, 0, 2)
+                };
+                PropiedadesPanel.Children.Add(label);
+
+                // MEJORADO: Crear un grid con colores predefinidos
+                var colorGrid = new UniformGrid
+                {
+                    Columns = 5,
+                    Rows = 2,
+                    Margin = new Thickness(0, 2, 0, 10)
+                };
+
+                var colores = new[] {
+                    Colors.Black, Colors.White, Colors.Red, Colors.Blue, Colors.Green,
+                    Colors.Yellow, Colors.Orange, Colors.Purple, Colors.Brown, Colors.Gray
+                };
+
+                foreach (var color in colores)
+                {
+                    var colorButton = new Button
+                    {
+                        Width = 25,
+                        Height = 20,
+                        Background = new SolidColorBrush(color),
+                        BorderBrush = color == colorActual ? Brushes.DarkBlue : Brushes.Gray,
+                        BorderThickness = color == colorActual ? new Thickness(3) : new Thickness(1),
+                        Margin = new Thickness(1),
+                        ToolTip = color.ToString()
+                    };
+
+                    colorButton.Click += (s, e) =>
+                    {
+                        // Actualizar todos los botones para quitar selección
+                        foreach (Button btn in colorGrid.Children)
+                        {
+                            btn.BorderBrush = Brushes.Gray;
+                            btn.BorderThickness = new Thickness(1);
+                        }
+
+                        // Marcar el botón seleccionado
+                        colorButton.BorderBrush = Brushes.DarkBlue;
+                        colorButton.BorderThickness = new Thickness(3);
+
+                        onChange(color);
+                    };
+
+                    colorGrid.Children.Add(colorButton);
+                }
+
+                PropiedadesPanel.Children.Add(colorGrid);
+
+                System.Diagnostics.Debug.WriteLine($"Selector color con grid agregado: {etiqueta}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error agregando selector color: {ex.Message}");
+            }
+        }
+
+        private void AgregarSelectorAlineacion(string etiqueta, TextAlignment alineacionActual, Action<TextAlignment> onChange)
+        {
+            try
+            {
+                var label = new TextBlock
+                {
+                    Text = etiqueta,
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 5, 0, 2)
+                };
+                PropiedadesPanel.Children.Add(label);
+
+                var comboBox = new ComboBox
+                {
+                    FontSize = 12,
+                    Height = 25,
+                    Margin = new Thickness(0, 2, 0, 10),
+                    Background = Brushes.White
+                };
+                comboBox.Items.Add("Left");
+                comboBox.Items.Add("Center");
+                comboBox.Items.Add("Right");
+                comboBox.Items.Add("Justify");
+                comboBox.SelectedItem = alineacionActual.ToString();
+
+                comboBox.SelectionChanged += (s, e) =>
+                {
+                    if (Enum.TryParse<TextAlignment>(comboBox.SelectedItem?.ToString(), out var alineacion))
+                    {
+                        onChange(alineacion);
+                    }
+                };
+
+                PropiedadesPanel.Children.Add(comboBox);
+                System.Diagnostics.Debug.WriteLine($"Selector alineación agregado: {etiqueta}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error agregando selector alineación: {ex.Message}");
+            }
+        }
 
         private void AgregarSelectorCampo(string etiqueta, string campoActual, Action<string> onChange)
         {
@@ -2355,88 +1712,27 @@ namespace ClubManager.Views
                 {
                     FontSize = 12,
                     Height = 25,
-                    Margin = new Thickness(0, 2, 0, 5),
+                    Margin = new Thickness(0, 2, 0, 10),
                     Background = Brushes.White
                 };
 
-                // Campos con descripciones
-                var campos = new Dictionary<string, string>
-                {
-                    { "NombreCompleto", "Nombre y apellidos del abonado" },
-                    { "Nombre", "Solo el nombre del abonado" },
-                    { "Apellidos", "Solo los apellidos del abonado" },
-                    { "NumeroSocio", "Número único de socio" },
-                    { "DNI", "Documento de identidad" },
-                    { "Telefono", "Teléfono de contacto" },
-                    { "Email", "Correo electrónico" },
-                    { "Peña", "Peña a la que pertenece" },
-                    { "TipoAbono", "Tipo de abonamiento" },
-                    { "Estado", "Estado actual del abono" },
-                    { "FechaNacimiento", "Fecha de nacimiento" },
-                    { "CodigoBarras", "Código único para códigos de barras" },
-                    { "Direccion", "Dirección del abonado" },
-                    { "TallaCamiseta", "Talla de camiseta" },
-                    { "FechaCreacion", "Fecha de alta como abonado" },
-                    { "Gestor", "Gestor asignado al abonado" }
-                };
+                var campos = new[] { "NombreCompleto", "Nombre", "Apellidos", "NumeroSocio", "DNI",
+                                   "Telefono", "Email", "Peña", "TipoAbono", "Estado", "FechaNacimiento", "CodigoBarras" };
 
                 foreach (var campo in campos)
                 {
-                    var item = new ComboBoxItem
-                    {
-                        Content = campo.Key,
-                        ToolTip = campo.Value
-                    };
-                    comboBox.Items.Add(item);
+                    comboBox.Items.Add(campo);
                 }
 
-                // Seleccionar el campo actual
-                foreach (ComboBoxItem item in comboBox.Items)
-                {
-                    if (item.Content.ToString() == campoActual)
-                    {
-                        comboBox.SelectedItem = item;
-                        break;
-                    }
-                }
+                comboBox.SelectedItem = campoActual;
 
                 comboBox.SelectionChanged += (s, e) =>
                 {
-                    if (comboBox.SelectedItem is ComboBoxItem selectedItem)
-                    {
-                        onChange(selectedItem.Content.ToString() ?? campoActual);
-                    }
+                    onChange(comboBox.SelectedItem?.ToString() ?? campoActual);
                 };
 
                 PropiedadesPanel.Children.Add(comboBox);
-
-                // Mostrar descripción del campo seleccionado
-                var descripcion = new TextBlock
-                {
-                    FontSize = 10,
-                    Foreground = Brushes.Gray,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 10)
-                };
-
-                if (campos.ContainsKey(campoActual))
-                {
-                    descripcion.Text = campos[campoActual];
-                }
-
-                PropiedadesPanel.Children.Add(descripcion);
-
-                // Actualizar descripción cuando cambie la selección
-                comboBox.SelectionChanged += (s, e) =>
-                {
-                    if (comboBox.SelectedItem is ComboBoxItem item &&
-                        campos.ContainsKey(item.Content.ToString() ?? ""))
-                    {
-                        descripcion.Text = campos[item.Content.ToString() ?? ""];
-                    }
-                };
-
-                System.Diagnostics.Debug.WriteLine($"Selector campo mejorado agregado: {etiqueta}");
+                System.Diagnostics.Debug.WriteLine($"Selector campo agregado: {etiqueta}");
             }
             catch (Exception ex)
             {
@@ -2444,7 +1740,7 @@ namespace ClubManager.Views
             }
         }
 
-        private void AgregarSelectorColorFondo(string etiqueta, Color colorActual, Action<Color> onChange)
+        private void AgregarComboBox(string etiqueta, string valorActual, string[] opciones, Action<string> onChange)
         {
             try
             {
@@ -2457,177 +1753,32 @@ namespace ClubManager.Views
                 };
                 PropiedadesPanel.Children.Add(label);
 
-                var fondoGrid = new UniformGrid
+                var comboBox = new ComboBox
                 {
-                    Columns = 6,
-                    Rows = 2,
-                    Margin = new Thickness(0, 2, 0, 10)
-                };
-
-                var coloresFondo = new[] {
-                    Colors.Transparent, Colors.White, Colors.LightGray, Colors.LightBlue, Colors.LightYellow, Colors.LightGreen,
-                    Colors.Black, Colors.DarkGray, Colors.Blue, Colors.Red, Colors.Orange, Colors.Purple
-                };
-
-                foreach (var color in coloresFondo)
-                {
-                    var colorButton = new Button
-                    {
-                        Width = 25,
-                        Height = 20,
-                        Margin = new Thickness(1),
-                        BorderBrush = color == colorActual ? Brushes.DarkBlue : Brushes.Gray,
-                        BorderThickness = color == colorActual ? new Thickness(3) : new Thickness(1)
-                    };
-
-                    // Fondo especial para transparente
-                    if (color == Colors.Transparent)
-                    {
-                        var checkeredBrush = new DrawingBrush
-                        {
-                            TileMode = TileMode.Tile,
-                            Viewport = new Rect(0, 0, 8, 8),
-                            ViewportUnits = BrushMappingMode.Absolute,
-                            Drawing = new GeometryDrawing
-                            {
-                                Brush = Brushes.LightGray,
-                                Geometry = Geometry.Parse("M 0,0 L 4,0 L 4,4 L 8,4 L 8,8 L 4,8 L 4,4 L 0,4 Z")
-                            }
-                        };
-                        colorButton.Background = checkeredBrush;
-                        colorButton.ToolTip = "Transparente";
-                    }
-                    else
-                    {
-                        colorButton.Background = new SolidColorBrush(color);
-                        colorButton.ToolTip = color.ToString();
-                    }
-
-                    colorButton.Click += (s, e) =>
-                    {
-                        // Actualizar todos los botones
-                        foreach (Button btn in fondoGrid.Children)
-                        {
-                            btn.BorderBrush = Brushes.Gray;
-                            btn.BorderThickness = new Thickness(1);
-                        }
-
-                        // Marcar el seleccionado
-                        colorButton.BorderBrush = Brushes.DarkBlue;
-                        colorButton.BorderThickness = new Thickness(3);
-
-                        onChange(color);
-                    };
-
-                    fondoGrid.Children.Add(colorButton);
-                }
-
-                PropiedadesPanel.Children.Add(fondoGrid);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error agregando selector color fondo: {ex.Message}");
-            }
-        }
-
-        private void AgregarVistaPreviewCodigo(ElementoCodigoBarras codigo)
-        {
-            try
-            {
-                var labelPreview = new TextBlock
-                {
-                    Text = "Vista previa:",
-                    FontWeight = FontWeights.SemiBold,
                     FontSize = 12,
-                    Margin = new Thickness(0, 10, 0, 5)
-                };
-                PropiedadesPanel.Children.Add(labelPreview);
-
-                var previewBorder = new Border
-                {
-                    Width = 150,
-                    Height = 60,
-                    BorderBrush = Brushes.LightGray,
-                    BorderThickness = new Thickness(1),
-                    Background = Brushes.White,
-                    Margin = new Thickness(0, 0, 0, 10)
+                    Height = 25,
+                    Margin = new Thickness(0, 2, 0, 10),
+                    Background = Brushes.White
                 };
 
-                // Generar preview del código
-                var valorEjemplo = _viewModel?.ObtenerValorCampo(codigo.CampoOrigen) ?? "123456789";
-                BitmapSource? previewImage = null;
-
-                try
+                foreach (var opcion in opciones)
                 {
-                    switch (codigo.TipoCodigo.ToUpper())
-                    {
-                        case "CODE128":
-                            previewImage = BarcodeGenerator.GenerateBarcode(valorEjemplo, 140, 40, "Code128");
-                            break;
-                        case "CODE39":
-                            previewImage = BarcodeGenerator.GenerateBarcode(valorEjemplo, 140, 40, "Code39");
-                            break;
-                        case "EAN13":
-                            var ean13 = valorEjemplo.Length >= 12 ? valorEjemplo.Substring(0, 12) : valorEjemplo.PadLeft(12, '0');
-                            previewImage = BarcodeGenerator.GenerateBarcode(ean13 + "0", 140, 40, "EAN13");
-                            break;
-                        case "QRCODE":
-                            previewImage = BarcodeGenerator.GenerateQRCode(valorEjemplo, 50);
-                            break;
-                    }
-
-                    if (previewImage != null)
-                    {
-                        var imagePreview = new Image
-                        {
-                            Source = previewImage,
-                            Stretch = Stretch.Uniform,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center
-                        };
-                        previewBorder.Child = imagePreview;
-                    }
-                    else
-                    {
-                        previewBorder.Child = new TextBlock
-                        {
-                            Text = "Error en preview",
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center,
-                            FontSize = 10,
-                            Foreground = Brushes.Red
-                        };
-                    }
-                }
-                catch
-                {
-                    previewBorder.Child = new TextBlock
-                    {
-                        Text = $"Preview\n{codigo.TipoCodigo}",
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        TextAlignment = TextAlignment.Center,
-                        FontSize = 10
-                    };
+                    comboBox.Items.Add(opcion);
                 }
 
-                PropiedadesPanel.Children.Add(previewBorder);
+                comboBox.SelectedItem = valorActual;
 
-                // Información del valor actual
-                var valorInfo = new TextBlock
+                comboBox.SelectionChanged += (s, e) =>
                 {
-                    Text = $"Valor: {valorEjemplo}",
-                    FontSize = 10,
-                    Foreground = Brushes.Gray,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    Margin = new Thickness(0, 0, 0, 5)
+                    onChange(comboBox.SelectedItem?.ToString() ?? valorActual);
                 };
-                PropiedadesPanel.Children.Add(valorInfo);
 
+                PropiedadesPanel.Children.Add(comboBox);
+                System.Diagnostics.Debug.WriteLine($"ComboBox agregado: {etiqueta}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error creando preview: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error agregando combobox: {ex.Message}");
             }
         }
 
@@ -2635,24 +1786,14 @@ namespace ClubManager.Views
         {
             try
             {
-                var openDialog = new OpenFileDialog
+                var openDialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif",
-                    Title = "Seleccionar imagen",
-                    Multiselect = false
+                    Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp",
+                    Title = "Seleccionar imagen"
                 };
 
                 if (openDialog.ShowDialog() == true)
                 {
-                    // Validar tamaño de archivo
-                    var fileInfo = new FileInfo(openDialog.FileName);
-                    if (fileInfo.Length > 5 * 1024 * 1024) // 5MB máximo
-                    {
-                        MessageBox.Show("El archivo es demasiado grande. Máximo 5MB permitido.",
-                                      "Archivo demasiado grande", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-
                     imagen.RutaImagen = openDialog.FileName;
                     ActualizarCanvas();
                     ActualizarPanelPropiedades(); // Actualizar para mostrar nuevo nombre
@@ -2665,6 +1806,45 @@ namespace ClubManager.Views
                 MessageBox.Show($"Error al cambiar imagen: {ex.Message}", "Error",
                               MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void ActualizarPropiedadesEnTiempoReal()
+        {
+            try
+            {
+                if (_viewModel?.ElementoSeleccionado == null) return;
+
+                // Buscar y actualizar solo los TextBox de posición sin recrear todo el panel
+                foreach (UIElement child in PropiedadesPanel.Children)
+                {
+                    if (child is TextBox textBox)
+                    {
+                        var previousChild = GetPreviousChild(textBox);
+                        if (previousChild is TextBlock label)
+                        {
+                            switch (label.Text)
+                            {
+                                case "Posición X:":
+                                    textBox.Text = _viewModel.ElementoSeleccionado.X.ToString("F0");
+                                    break;
+                                case "Posición Y:":
+                                    textBox.Text = _viewModel.ElementoSeleccionado.Y.ToString("F0");
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error actualizando propiedades en tiempo real: {ex.Message}");
+            }
+        }
+
+        private UIElement? GetPreviousChild(UIElement element)
+        {
+            var index = PropiedadesPanel.Children.IndexOf(element);
+            return index > 0 ? PropiedadesPanel.Children[index - 1] : null;
         }
 
         #endregion
@@ -2707,20 +1887,13 @@ namespace ClubManager.Views
 
         #region Cleanup y Eventos de Cierre
 
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
             try
             {
-                // Limpiar recursos antes de cerrar
                 if (_viewModel != null)
                 {
                     _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
-
-                    // Llamar a dispose si está disponible
-                    if (_viewModel is IDisposable disposableViewModel)
-                    {
-                        disposableViewModel.Dispose();
-                    }
                 }
 
                 // Limpiar handles de redimensionamiento
@@ -2733,99 +1906,13 @@ namespace ClubManager.Views
                     CanvasScrollViewer.PreviewMouseRightButtonDown -= Canvas_PreviewMouseRightButtonDown;
                     CanvasScrollViewer.PreviewMouseWheel -= ScrollViewer_PreviewMouseWheel;
                 }
-
-                // Limpiar eventos del canvas
-                if (CanvasTarjeta != null)
-                {
-                    CanvasTarjeta.MouseLeftButtonDown -= Canvas_MouseLeftButtonDown;
-                    CanvasTarjeta.MouseMove -= Canvas_MouseMove;
-                    CanvasTarjeta.MouseLeftButtonUp -= Canvas_MouseLeftButtonUp;
-                    CanvasTarjeta.MouseLeave -= Canvas_MouseLeave;
-                    CanvasTarjeta.MouseRightButtonDown -= Canvas_MouseRightButtonDown;
-                }
-
-                System.Diagnostics.Debug.WriteLine("Recursos limpiados correctamente");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error durante el cleanup: {ex.Message}");
-            }
-
-            base.OnClosing(e);
-        }
-
-        protected override void OnClosed(EventArgs e)
-        {
-            try
-            {
-                System.Diagnostics.Debug.WriteLine("CardDesignerWindow cerrada correctamente");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error final al cerrar: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error al cerrar: {ex.Message}");
             }
 
             base.OnClosed(e);
-        }
-
-        #endregion
-
-        #region Métodos de Optimización
-
-        private void OptimizarRendimiento()
-        {
-            try
-            {
-                // Limpiar elementos fuera de los límites del canvas
-                if (_viewModel != null)
-                {
-                    _viewModel.OptimizarRendimiento();
-                }
-
-                // Limpiar handles innecesarios
-                if (_viewModel?.ElementoSeleccionado == null)
-                {
-                    LimpiarHandlesRedimensionamiento();
-                }
-
-                // Forzar garbage collection si es necesario
-                if (GC.GetTotalMemory(false) > 50 * 1024 * 1024) // 50MB
-                {
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    System.Diagnostics.Debug.WriteLine("Garbage collection ejecutado");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error optimizando rendimiento: {ex.Message}");
-            }
-        }
-
-        // Método para diagnosticar problemas
-        private void DiagnosticarEstado()
-        {
-            try
-            {
-                var diagnostico = new System.Text.StringBuilder();
-                diagnostico.AppendLine("=== DIAGNÓSTICO CardDesignerWindow ===");
-                diagnostico.AppendLine($"ViewModel: {(_viewModel != null ? "OK" : "NULL")}");
-                diagnostico.AppendLine($"Canvas: {(CanvasTarjeta != null ? "OK" : "NULL")}");
-                diagnostico.AppendLine($"PropiedadesPanel: {(PropiedadesPanel != null ? "OK" : "NULL")}");
-                diagnostico.AppendLine($"Elementos en canvas: {CanvasTarjeta?.Children.Count ?? 0}");
-                diagnostico.AppendLine($"Elementos en ViewModel: {_viewModel?.ElementosActuales.Count ?? 0}");
-                diagnostico.AppendLine($"Elemento seleccionado: {_viewModel?.ElementoSeleccionado?.Tipo ?? "Ninguno"}");
-                diagnostico.AppendLine($"Handles activos: {_resizeHandles.Count}");
-                diagnostico.AppendLine($"Zoom actual: {_zoomFactor:P0}");
-                diagnostico.AppendLine($"Arrastrando: {_isDragging}");
-                diagnostico.AppendLine($"Redimensionando: {_isResizing}");
-
-                System.Diagnostics.Debug.WriteLine(diagnostico.ToString());
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error en diagnóstico: {ex.Message}");
-            }
         }
 
         #endregion

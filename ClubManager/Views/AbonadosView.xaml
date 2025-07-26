@@ -70,7 +70,8 @@
                     <!-- TextBox de búsqueda -->
                     <TextBox Grid.Row="0" Grid.Column="0" 
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             FontSize="14" Height="35" Padding="8"
+                             Style="{StaticResource ModernTextBox}"
+                             FontSize="14" Height="35" 
                              Background="{DynamicResource TextBoxBackgroundBrush}"
                              Foreground="{DynamicResource TextBoxForegroundBrush}"
                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
@@ -189,7 +190,13 @@
                             Margin="0,0,5,0" Height="32" Padding="10,5"
                             FontSize="12"/>
 
-                    <Button Content="🖨️ Marcar Impresos" 
+                    <Button Content="🖨️ Imprimir Tarjetas" 
+                            Style="{StaticResource InfoButton}"
+                            Command="{Binding PrintSelectedCardsCommand}"
+                            Margin="0,0,5,0" Height="32" Padding="10,5"
+                            FontSize="12"/>
+
+                    <Button Content="✅ Marcar Impresos" 
                             Style="{StaticResource InfoButton}"
                             Command="{Binding MarkSelectedAsPrintedCommand}"
                             Margin="0,0,5,0" Height="32" Padding="10,5"
@@ -318,7 +325,7 @@
                                     Width="100"/>
 
                 <!-- Acciones -->
-                <DataGridTemplateColumn Header="Acciones" Width="200">
+                <DataGridTemplateColumn Header="Acciones" Width="250">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -338,10 +345,25 @@
 
                                 <Button Content="🖨️" 
                                         Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.PrintCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Imprimir Tarjeta"
+                                        Margin="2"/>
+
+                                <Button Content="📊" 
+                                        Style="{StaticResource IconButton}"
                                         Command="{Binding DataContext.MarkAsPrintedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="Marcar Impreso"
                                         Margin="2"/>
+
+                                <Button Content="📱" 
+                                        Style="{StaticResource InfoButton}"
+                                        Command="{Binding DataContext.WriteNfcCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Grabar en NFC"
+                                        Margin="2"
+                                        Width="30" Height="30"/>
 
                                 <Button Content="🗑️" 
                                         Style="{StaticResource DangerIconButton}"

@@ -114,12 +114,23 @@ namespace ClubManager.Services
                 var predeterminada = plantillas.FirstOrDefault(p => p.EsPredeterminada);
 
                 // Si no hay predeterminada, usar la primera disponible
-                return predeterminada ?? plantillas.FirstOrDefault();
+                if (predeterminada == null && plantillas.Any())
+                {
+                    predeterminada = plantillas.First();
+                    predeterminada.EsPredeterminada = true;
+                    await GuardarPlantillaAsync(predeterminada);
+                }
+
+                return predeterminada;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error obteniendo plantilla predeterminada: {ex.Message}");
-                return null;
+
+                // Crear plantilla básica si no hay ninguna
+                var plantillaBasica = CrearPlantillaBasica();
+                await GuardarPlantillaAsync(plantillaBasica);
+                return plantillaBasica;
             }
         }
 
@@ -145,6 +156,7 @@ namespace ClubManager.Services
                 // Actualizar estadísticas
                 await ActualizarEstadisticasAsync(plantilla.Id, "Guardada");
 
+                System.Diagnostics.Debug.WriteLine($"Plantilla guardada: {plantilla.Nombre} (Predeterminada: {plantilla.EsPredeterminada})");
                 return true;
             }
             catch (Exception ex)
@@ -162,8 +174,6 @@ namespace ClubManager.Services
                 if (File.Exists(archivo))
                 {
                     File.Delete(archivo);
-
-                    // Actualizar estadísticas
                     await ActualizarEstadisticasAsync(id, "Eliminada");
                     return true;
                 }
@@ -197,7 +207,9 @@ namespace ClubManager.Services
                 if (nuevaPredeterminada != null)
                 {
                     nuevaPredeterminada.EsPredeterminada = true;
-                    return await GuardarPlantillaAsync(nuevaPredeterminada);
+                    var resultado = await GuardarPlantillaAsync(nuevaPredeterminada);
+                    System.Diagnostics.Debug.WriteLine($"Plantilla {nuevaPredeterminada.Nombre} establecida como predeterminada: {resultado}");
+                    return resultado;
                 }
 
                 return false;
@@ -215,17 +227,13 @@ namespace ClubManager.Services
             {
                 var original = await GetPlantillaByIdAsync(id);
                 if (original == null)
-                    throw new ArgumentException("Plantilla no encontrada");
+                    throw new ArgumentException($"Plantilla con ID {id} no encontrada");
 
                 var duplicada = original.Clonar(nuevoNombre);
+                duplicada.EsPredeterminada = false; // Las copias no son predeterminadas
 
-                if (await GuardarPlantillaAsync(duplicada))
-                {
-                    await ActualizarEstadisticasAsync(duplicada.Id, "Duplicada");
-                    return duplicada;
-                }
-
-                throw new Exception("Error al guardar plantilla duplicada");
+                await GuardarPlantillaAsync(duplicada);
+                return duplicada;
             }
             catch (Exception ex)
             {
@@ -239,10 +247,16 @@ namespace ClubManager.Services
             try
             {
                 var errores = plantilla.Validar();
-                return errores.Count == 0;
+                if (errores.Any())
+                {
+                    System.Diagnostics.Debug.WriteLine($"Errores de validación en plantilla {plantilla.Nombre}: {string.Join(", ", errores)}");
+                    return false;
+                }
+                return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error validando plantilla: {ex.Message}");
                 return false;
             }
         }
@@ -253,13 +267,9 @@ namespace ClubManager.Services
             {
                 var plantilla = await GetPlantillaByIdAsync(id);
                 if (plantilla == null)
-                    throw new ArgumentException("Plantilla no encontrada");
+                    throw new ArgumentException($"Plantilla con ID {id} no encontrada");
 
-                var json = JsonSerializer.Serialize(plantilla, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
-
+                var json = JsonSerializer.Serialize(plantilla, new JsonSerializerOptions { WriteIndented = true });
                 return System.Text.Encoding.UTF8.GetBytes(json);
             }
             catch (Exception ex)
@@ -276,22 +286,18 @@ namespace ClubManager.Services
                 var json = System.Text.Encoding.UTF8.GetString(data);
                 var plantilla = JsonSerializer.Deserialize<PlantillaTarjeta>(json);
 
-                if (plantilla == null)
-                    return null;
-
-                // Generar nuevo ID para evitar conflictos
-                plantilla.Id = Guid.NewGuid().ToString();
-                plantilla.FechaCreacion = DateTime.Now;
-                plantilla.FechaModificacion = DateTime.Now;
-                plantilla.EsPredeterminada = false;
-
-                if (await GuardarPlantillaAsync(plantilla))
+                if (plantilla != null)
                 {
-                    await ActualizarEstadisticasAsync(plantilla.Id, "Importada");
-                    return plantilla;
+                    // Generar nuevo ID para evitar conflictos
+                    plantilla.Id = Guid.NewGuid().ToString();
+                    plantilla.EsPredeterminada = false;
+                    plantilla.FechaCreacion = DateTime.Now;
+                    plantilla.FechaModificacion = DateTime.Now;
+
+                    await GuardarPlantillaAsync(plantilla);
                 }
 
-                return null;
+                return plantilla;
             }
             catch (Exception ex)
             {
@@ -308,8 +314,7 @@ namespace ClubManager.Services
                     return new List<EstadisticasPlantilla>();
 
                 var json = await File.ReadAllTextAsync(_statisticsFile);
-                var estadisticas = JsonSerializer.Deserialize<List<EstadisticasPlantilla>>(json);
-                return estadisticas ?? new List<EstadisticasPlantilla>();
+                return JsonSerializer.Deserialize<List<EstadisticasPlantilla>>(json) ?? new List<EstadisticasPlantilla>();
             }
             catch (Exception ex)
             {
@@ -332,32 +337,31 @@ namespace ClubManager.Services
                     {
                         PlantillaId = plantillaId,
                         NombrePlantilla = plantilla?.Nombre ?? "Desconocida",
-                        FechaCreacion = plantilla?.FechaCreacion ?? DateTime.Now,
-                        EstaActiva = true
+                        FechaCreacion = plantilla?.FechaCreacion ?? DateTime.Now
                     };
                     estadisticas.Add(estadistica);
                 }
 
-                estadistica.UltimaUtilizacion = DateTime.Now;
-
-                switch (accion.ToLower())
+                switch (accion)
                 {
-                    case "utilizada":
-                    case "impresa":
-                        estadistica.VecesUtilizada++;
-                        if (accion.ToLower() == "impresa")
-                            estadistica.TarjetasImpresas++;
+                    case "Guardada":
+                        estadistica.UltimaUtilizacion = DateTime.Now;
                         break;
-                    case "eliminada":
+                    case "Utilizada":
+                        estadistica.VecesUtilizada++;
+                        estadistica.UltimaUtilizacion = DateTime.Now;
+                        break;
+                    case "Impresa":
+                        estadistica.TarjetasImpresas++;
+                        estadistica.VecesUtilizada++;
+                        estadistica.UltimaUtilizacion = DateTime.Now;
+                        break;
+                    case "Eliminada":
                         estadistica.EstaActiva = false;
                         break;
                 }
 
-                var json = JsonSerializer.Serialize(estadisticas, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
-
+                var json = JsonSerializer.Serialize(estadisticas, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_statisticsFile, json);
             }
             catch (Exception ex)
@@ -371,373 +375,107 @@ namespace ClubManager.Services
             try
             {
                 var plantillas = await GetPlantillasAsync();
-                if (plantillas.Any())
-                    return; // Ya existen plantillas
-
-                // Crear plantilla básica
-                var plantillaBasica = new PlantillaTarjeta
+                if (!plantillas.Any())
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    Nombre = "Plantilla Básica",
-                    Descripcion = "Plantilla básica con información esencial del abonado",
-                    Ancho = 350,
-                    Alto = 220,
-                    FechaCreacion = DateTime.Now,
-                    FechaModificacion = DateTime.Now,
-                    EsPredeterminada = true,
-                    Elementos = new List<ElementoTarjeta>
-                    {
-                        // Título del club
-                        new ElementoTexto
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Texto",
-                            X = 20,
-                            Y = 15,
-                            Ancho = 310,
-                            Alto = 25,
-                            ZIndex = 1,
-                            Texto = "CLUB DEPORTIVO",
-                            FontFamily = "Arial",
-                            FontSize = 16,
-                            Color = Colors.DarkBlue,
-                            IsBold = true,
-                            TextAlignment = System.Windows.TextAlignment.Center
-                        },
-                        
-                        // Nombre del abonado
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 50,
-                            Ancho = 200,
-                            Alto = 25,
-                            ZIndex = 2,
-                            CampoOrigen = "NombreCompleto",
-                            Texto = "{NombreCompleto}",
-                            FontFamily = "Arial",
-                            FontSize = 14,
-                            Color = Colors.Black,
-                            IsBold = true
-                        },
-                        
-                        // Número de socio
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 80,
-                            Ancho = 150,
-                            Alto = 20,
-                            ZIndex = 3,
-                            CampoOrigen = "NumeroSocio",
-                            Texto = "Socio N°: {NumeroSocio}",
-                            FontFamily = "Arial",
-                            FontSize = 12,
-                            Color = Colors.Black,
-                            Prefijo = "Socio N°: "
-                        },
-                        
-                        // DNI
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 105,
-                            Ancho = 150,
-                            Alto = 20,
-                            ZIndex = 4,
-                            CampoOrigen = "DNI",
-                            Texto = "DNI: {DNI}",
-                            FontFamily = "Arial",
-                            FontSize = 12,
-                            Color = Colors.Black,
-                            Prefijo = "DNI: ",
-                            TextoSiVacio = "DNI: No especificado"
-                        },
-                        
-                        // Código de barras
-                        new ElementoCodigoBarras
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Código de Barras",
-                            X = 180,
-                            Y = 140,
-                            Ancho = 150,
-                            Alto = 60,
-                            ZIndex = 5,
-                            TipoCodigo = "Code128",
-                            CampoOrigen = "CodigoBarras",
-                            MostrarTexto = true,
-                            FontFamily = "Courier New",
-                            FontSize = 8,
-                            ColorTexto = Colors.Black,
-                            ColorFondo = Colors.White
-                        }
-                    }
-                };
+                    // Crear plantilla básica por defecto
+                    var plantillaBasica = CrearPlantillaBasica();
+                    await GuardarPlantillaAsync(plantillaBasica);
 
-                await GuardarPlantillaAsync(plantillaBasica);
-
-                // Crear plantilla completa
-                var plantillaCompleta = new PlantillaTarjeta
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Nombre = "Plantilla Completa",
-                    //Descripción = "Plantilla con toda la información del abonado",
-                    Ancho = 350,
-                    Alto = 220,
-                    FechaCreacion = DateTime.Now,
-                    FechaModificacion = DateTime.Now,
-                    EsPredeterminada = false,
-                    Elementos = new List<ElementoTarjeta>
-                    {
-                        // Título del club
-                        new ElementoTexto
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Texto",
-                            X = 20,
-                            Y = 10,
-                            Ancho = 310,
-                            Alto = 20,
-                            ZIndex = 1,
-                            Texto = "CLUB DEPORTIVO - TEMPORADA 2025",
-                            FontFamily = "Arial",
-                            FontSize = 12,
-                            Color = Colors.DarkBlue,
-                            IsBold = true,
-                            TextAlignment = System.Windows.TextAlignment.Center
-                        },
-                        
-                        // Nombre del abonado
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 35,
-                            Ancho = 200,
-                            Alto = 20,
-                            ZIndex = 2,
-                            CampoOrigen = "NombreCompleto",
-                            Texto = "{NombreCompleto}",
-                            FontFamily = "Arial",
-                            FontSize = 13,
-                            Color = Colors.Black,
-                            IsBold = true
-                        },
-                        
-                        // Número de socio
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 58,
-                            Ancho = 100,
-                            Alto = 18,
-                            ZIndex = 3,
-                            CampoOrigen = "NumeroSocio",
-                            Texto = "N°: {NumeroSocio}",
-                            FontFamily = "Arial",
-                            FontSize = 11,
-                            Color = Colors.Black,
-                            Prefijo = "N°: "
-                        },
-                        
-                        // DNI
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 125,
-                            Y = 58,
-                            Ancho = 120,
-                            Alto = 18,
-                            ZIndex = 4,
-                            CampoOrigen = "DNI",
-                            Texto = "DNI: {DNI}",
-                            FontFamily = "Arial",
-                            FontSize = 11,
-                            Color = Colors.Black,
-                            Prefijo = "DNI: ",
-                            TextoSiVacio = "DNI: No especificado"
-                        },
-                        
-                        // Peña
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 78,
-                            Ancho = 200,
-                            Alto = 18,
-                            ZIndex = 5,
-                            CampoOrigen = "Peña",
-                            Texto = "Peña: {Peña}",
-                            FontFamily = "Arial",
-                            FontSize = 11,
-                            Color = Colors.Black,
-                            Prefijo = "Peña: ",
-                            TextoSiVacio = "Peña: Sin asignar"
-                        },
-                        
-                        // Tipo de abono
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 98,
-                            Ancho = 200,
-                            Alto = 18,
-                            ZIndex = 6,
-                            CampoOrigen = "TipoAbono",
-                            Texto = "Abono: {TipoAbono}",
-                            FontFamily = "Arial",
-                            FontSize = 11,
-                            Color = Colors.Black,
-                            Prefijo = "Abono: ",
-                            TextoSiVacio = "Abono: No especificado"
-                        },
-                        
-                        // Estado
-                        new ElementoCampoDinamico
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Campo Dinámico",
-                            X = 20,
-                            Y = 118,
-                            Ancho = 100,
-                            Alto = 18,
-                            ZIndex = 7,
-                            CampoOrigen = "Estado",
-                            Texto = "{Estado}",
-                            FontFamily = "Arial",
-                            FontSize = 11,
-                            Color = Colors.Green,
-                            IsBold = true
-                        },
-                        
-                        // Código de barras
-                        new ElementoCodigoBarras
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Código de Barras",
-                            X = 180,
-                            Y = 150,
-                            Ancho = 150,
-                            Alto = 50,
-                            ZIndex = 8,
-                            TipoCodigo = "Code128",
-                            CampoOrigen = "CodigoBarras",
-                            MostrarTexto = true,
-                            FontFamily = "Courier New",
-                            FontSize = 7,
-                            ColorTexto = Colors.Black,
-                            ColorFondo = Colors.White
-                        },
-                        
-                        // Texto de validez
-                        new ElementoTexto
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Tipo = "Texto",
-                            X = 20,
-                            Y = 190,
-                            Ancho = 310,
-                            Alto = 15,
-                            ZIndex = 9,
-                            Texto = "Válido para temporada 2025 - Intransferible",
-                            FontFamily = "Arial",
-                            FontSize = 9,
-                            Color = Colors.Gray,
-                            IsItalic = true,
-                            TextAlignment = System.Windows.TextAlignment.Center
-                        }
-                    }
-                };
-
-                await GuardarPlantillaAsync(plantillaCompleta);
-
-                System.Diagnostics.Debug.WriteLine("Plantillas por defecto creadas exitosamente");
+                    System.Diagnostics.Debug.WriteLine("Plantilla básica creada automáticamente");
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando plantillas por defecto: {ex.Message}");
             }
         }
-    }
 
-    /// <summary>
-    /// Extensiones para facilitar el trabajo con el servicio de plantillas
-    /// </summary>
-    public static class TemplateServiceExtensions
-    {
-        /// <summary>
-        /// Obtiene las plantillas más utilizadas
-        /// </summary>
-        public static async Task<List<PlantillaTarjeta>> GetPlantillasMasUtilizadasAsync(this ITemplateService service, int cantidad = 5)
+        private PlantillaTarjeta CrearPlantillaBasica()
         {
-            try
+            return new PlantillaTarjeta
             {
-                var estadisticas = await service.GetEstadisticasAsync();
-                var plantillas = await service.GetPlantillasAsync();
-
-                var masUtilizadas = estadisticas
-                    .Where(e => e.EstaActiva)
-                    .OrderByDescending(e => e.VecesUtilizada)
-                    .Take(cantidad)
-                    .ToList();
-
-                var resultado = new List<PlantillaTarjeta>();
-                foreach (var estadistica in masUtilizadas)
+                Id = Guid.NewGuid().ToString(),
+                Nombre = "Plantilla Básica",
+                Descripcion = "Plantilla básica creada automáticamente",
+                Ancho = 350,
+                Alto = 220,
+                EsPredeterminada = true,
+                FechaCreacion = DateTime.Now,
+                FechaModificacion = DateTime.Now,
+                Elementos = new List<ElementoTarjeta>
                 {
-                    var plantilla = plantillas.FirstOrDefault(p => p.Id == estadistica.PlantillaId);
-                    if (plantilla != null)
+                    new ElementoTexto
                     {
-                        resultado.Add(plantilla);
+                        Id = Guid.NewGuid().ToString(),
+                        Tipo = "Texto",
+                        X = 20,
+                        Y = 20,
+                        Ancho = 310,
+                        Alto = 30,
+                        ZIndex = 1,
+                        Texto = "CLUB DEPORTIVO",
+                        FontFamily = "Arial",
+                        FontSize = 18,
+                        IsBold = true,
+                        Color = Colors.DarkBlue,
+                        TextAlignment = System.Windows.TextAlignment.Center
+                    },
+                    new ElementoCampoDinamico
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Tipo = "Campo Dinámico",
+                        X = 20,
+                        Y = 60,
+                        Ancho = 200,
+                        Alto = 25,
+                        ZIndex = 2,
+                        CampoOrigen = "NombreCompleto",
+                        FontFamily = "Arial",
+                        FontSize = 14,
+                        IsBold = true,
+                        Color = Colors.Black
+                    },
+                    new ElementoCampoDinamico
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Tipo = "Campo Dinámico",
+                        X = 20,
+                        Y = 90,
+                        Ancho = 150,
+                        Alto = 20,
+                        ZIndex = 3,
+                        CampoOrigen = "NumeroSocio",
+                        Prefijo = "Socio Nº: ",
+                        FontFamily = "Arial",
+                        FontSize = 12,
+                        Color = Colors.DarkGray
+                    },
+                    new ElementoCodigoBarras
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Tipo = "Código de Barras",
+                        X = 20,
+                        Y = 130,
+                        Ancho = 200,
+                        Alto = 60,
+                        ZIndex = 4,
+                        CampoOrigen = "CodigoBarras",
+                        TipoCodigo = "Code128",
+                        MostrarTexto = true,
+                        FontSize = 8,
+                        ColorTexto = Colors.Black,
+                        ColorFondo = Colors.White
                     }
                 }
-
-                return resultado;
-            }
-            catch
-            {
-                return new List<PlantillaTarjeta>();
-            }
+            };
         }
 
-        /// <summary>
-        /// Marca una plantilla como utilizada para estadísticas
-        /// </summary>
-        public static async Task MarcarComoUtilizadaAsync(this ITemplateService service, string plantillaId)
+        // Método público para crear una plantilla predeterminada si es necesario
+        public async Task<PlantillaTarjeta> CrearYGuardarPlantillaBasicaAsync()
         {
-            try
-            {
-                // El método ActualizarEstadisticasAsync es privado, pero se puede acceder a través de reflexión
-                // o mejor aún, crear un método público en la interfaz
-                var templateService = service as TemplateService;
-                if (templateService != null)
-                {
-                    var method = typeof(TemplateService).GetMethod("ActualizarEstadisticasAsync",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (method != null)
-                    {
-                        await (Task)method.Invoke(templateService, new object[] { plantillaId, "utilizada" });
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error marcando plantilla como utilizada: {ex.Message}");
-            }
+            var plantilla = CrearPlantillaBasica();
+            await GuardarPlantillaAsync(plantilla);
+            return plantilla;
         }
     }
 }

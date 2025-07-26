@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace ClubManager.Data
 {
@@ -16,7 +17,7 @@ namespace ClubManager.Data
         public DbSet<Usuario> Usuarios { get; set; } = null!;
         public DbSet<UserPermissions> UserPermissions { get; set; } = null!;
         public DbSet<HistorialAccion> HistorialAcciones { get; set; } = null!;
-        public DbSet<Configuracion> Configuracion { get; set; } = null!; // ✅ AÑADIDO
+        public DbSet<Configuracion> Configuracion { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -34,7 +35,7 @@ namespace ClubManager.Data
             // Configuraciones de entidades
             ConfigureAbonado(modelBuilder);
             ConfigureUsuario(modelBuilder);
-            ConfigureConfiguracion(modelBuilder); // ✅ AÑADIDO
+            ConfigureConfiguracion(modelBuilder);
             SeedData(modelBuilder);
         }
 
@@ -67,14 +68,13 @@ namespace ClubManager.Data
             });
         }
 
-        // ✅ MÉTODO AÑADIDO
         private void ConfigureConfiguracion(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Configuracion>(entity =>
             {
                 entity.HasKey(e => e.Id);
 
-                // Configurar propiedades
+                // Configurar propiedades básicas
                 entity.Property(e => e.NombreClub).HasMaxLength(200);
                 entity.Property(e => e.TemporadaActual).HasMaxLength(50);
                 entity.Property(e => e.DireccionClub).HasMaxLength(500);
@@ -84,6 +84,14 @@ namespace ClubManager.Data
                 entity.Property(e => e.LogoClub).HasMaxLength(500);
                 entity.Property(e => e.RutaEscudo).HasMaxLength(500);
                 entity.Property(e => e.FormatoNumeroSocio).HasMaxLength(50);
+                entity.Property(e => e.Version).HasMaxLength(20);
+
+                // Configurar la propiedad compleja ConfiguracionImpresion como JSON
+                entity.Property(e => e.ConfiguracionImpresion)
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                        v => JsonSerializer.Deserialize<ConfiguracionImpresionTarjetas>(v, (JsonSerializerOptions)null) ?? new ConfiguracionImpresionTarjetas())
+                    .HasColumnType("TEXT");
             });
         }
 
@@ -130,7 +138,22 @@ namespace ClubManager.Data
                 CanCreateBackups = true
             });
 
-            // ✅ CONFIGURACIÓN INICIAL
+            // Configuración inicial con ConfiguracionImpresion incluida
+            var configuracionImpresion = new ConfiguracionImpresionTarjetas
+            {
+                ImpresoraPredeterminada = "",
+                TamañoPapel = "A4",
+                ImpresionColor = true,
+                Calidad = 300,
+                TarjetasPorPagina = 10,
+                EspaciadoHorizontal = 5,
+                EspaciadoVertical = 5,
+                MarcarComoImpresoAutomaticamente = true,
+                MostrarVistaPrevia = true,
+                GuardarCopiaDigital = false,
+                RutaCopiasDigitales = ""
+            };
+
             modelBuilder.Entity<Configuracion>().HasData(new Configuracion
             {
                 Id = 1,
@@ -146,9 +169,11 @@ namespace ClubManager.Data
                 ConfirmarEliminaciones = true,
                 MostrarAyudas = true,
                 NumeracionAutomatica = true,
-                FormatoNumeroSocio = "simple",
+                FormatoNumeroSocio = "###000",
+                ConfiguracionImpresion = configuracionImpresion,
                 FechaCreacion = DateTime.Now,
-                FechaModificacion = DateTime.Now
+                FechaModificacion = DateTime.Now,
+                Version = "1.0"
             });
 
             // Datos iniciales

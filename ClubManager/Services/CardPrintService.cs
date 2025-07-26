@@ -21,6 +21,7 @@ namespace ClubManager.Services
     {
         Task<bool> ImprimirTarjetaAsync(Abonado abonado, PlantillaTarjeta plantilla);
         Task<bool> ImprimirTarjetasAsync(List<Abonado> abonados, PlantillaTarjeta plantilla);
+        Task<ResultadoImpresion> ImprimirTarjetaAsync(Abonado abonado, PlantillaTarjeta plantilla, ConfiguracionImpresionEspecifica configuracion);
         Task<FrameworkElement> GenerarVistaPreviaAsync(Abonado abonado, PlantillaTarjeta plantilla);
         Task<BitmapSource> GenerarImagenTarjetaAsync(Abonado abonado, PlantillaTarjeta plantilla);
         Task<bool> ExportarTarjetaAPdfAsync(Abonado abonado, PlantillaTarjeta plantilla, string rutaArchivo);
@@ -31,10 +32,12 @@ namespace ClubManager.Services
     public class CardPrintService : ICardPrintService
     {
         private readonly ITemplateService _templateService;
+        private readonly IConfiguracionService _configuracionService;
 
-        public CardPrintService(ITemplateService templateService)
+        public CardPrintService(ITemplateService templateService, IConfiguracionService configuracionService = null)
         {
             _templateService = templateService;
+            _configuracionService = configuracionService ?? new ConfiguracionService();
         }
 
         public async Task<bool> ImprimirTarjetaAsync(Abonado abonado, PlantillaTarjeta plantilla)
@@ -48,11 +51,36 @@ namespace ClubManager.Services
                 // Configurar impresión
                 var printDialog = new System.Windows.Controls.PrintDialog();
 
-                // Configurar tamaño de página para tarjetas
-                var pageSize = new Size(
-                    ConvertirPixelsAPuntos(plantilla.Ancho),
-                    ConvertirPixelsAPuntos(plantilla.Alto)
-                );
+                // Obtener configuración guardada
+                var configuracion = _configuracionService.GetConfiguracion();
+
+                // Configurar impresora predeterminada si está disponible
+                if (!string.IsNullOrEmpty(configuracion.ConfiguracionImpresion.ImpresoraPredeterminada))
+                {
+                    var impresoras = GetImpresorasDisponibles();
+                    if (impresoras.Contains(configuracion.ConfiguracionImpresion.ImpresoraPredeterminada))
+                    {
+                        var printer = new System.Drawing.Printing.PrinterSettings();
+                        printer.PrinterName = configuracion.ConfiguracionImpresion.ImpresoraPredeterminada;
+
+                        // Solo mostrar diálogo si está configurado para hacerlo
+                        if (configuracion.ConfiguracionImpresion.MostrarVistaPrevia)
+                        {
+                            if (printDialog.ShowDialog() != true)
+                                return false;
+                        }
+                    }
+                }
+                else
+                {
+                    // Mostrar diálogo de selección de impresora
+                    if (printDialog.ShowDialog() != true)
+                        return false;
+                }
+
+                // NUEVO: Configurar tamaño de página basado en la plantilla
+                var pageSize = CalcularTamañoPaginaOptimo(plantilla);
+                System.Diagnostics.Debug.WriteLine($"Tamaño de página calculado: {pageSize.Width}x{pageSize.Height} puntos para plantilla {plantilla.Ancho}x{plantilla.Alto} píxeles");
 
                 // Crear documento de impresión
                 var document = new FixedDocument();
@@ -62,9 +90,17 @@ namespace ClubManager.Services
                     Height = pageSize.Height
                 };
 
-                // Escalar la tarjeta al tamaño de impresión
-                tarjeta.Width = pageSize.Width;
-                tarjeta.Height = pageSize.Height;
+                // Escalar la tarjeta al tamaño de impresión óptimo
+                var escala = CalcularEscalaOptima(plantilla, pageSize);
+                tarjeta.Width = plantilla.Ancho * escala;
+                tarjeta.Height = plantilla.Alto * escala;
+
+                // Centrar la tarjeta en la página
+                var marginX = (pageSize.Width - tarjeta.Width) / 2;
+                var marginY = (pageSize.Height - tarjeta.Height) / 2;
+
+                Canvas.SetLeft(tarjeta, Math.Max(0, marginX));
+                Canvas.SetTop(tarjeta, Math.Max(0, marginY));
 
                 page.Children.Add(tarjeta);
 
@@ -76,8 +112,21 @@ namespace ClubManager.Services
                 printDialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator,
                     $"Tarjeta de {abonado.NombreCompleto}");
 
-                // Marcar como impreso
-                abonado.Impreso = true;
+                // Marcar como impreso solo si la configuración lo permite
+                if (configuracion.ConfiguracionImpresion.MarcarComoImpresoAutomaticamente)
+                {
+                    abonado.Impreso = true;
+                }
+
+                // Guardar copia digital si está configurado
+                if (configuracion.ConfiguracionImpresion.GuardarCopiaDigital &&
+                    !string.IsNullOrEmpty(configuracion.ConfiguracionImpresion.RutaCopiasDigitales))
+                {
+                    await GuardarCopiaDigitalAsync(abonado, plantilla, configuracion.ConfiguracionImpresion.RutaCopiasDigitales);
+                }
+
+                // Actualizar estadísticas de la plantilla
+                await ActualizarEstadisticasPlantilla(plantilla.Id, "Impresa");
 
                 return true;
             }
@@ -88,6 +137,118 @@ namespace ClubManager.Services
             }
         }
 
+        public async Task<ResultadoImpresion> ImprimirTarjetaAsync(Abonado abonado, PlantillaTarjeta plantilla, ConfiguracionImpresionEspecifica configuracion)
+        {
+            var inicio = DateTime.Now;
+            var resultado = new ResultadoImpresion();
+
+            try
+            {
+                // Validar plantilla
+                if (plantilla == null)
+                {
+                    resultado.Errores.Add("Plantilla no válida");
+                    return resultado;
+                }
+
+                // Validar impresora
+                if (!string.IsNullOrEmpty(configuracion.NombreImpresora))
+                {
+                    var esValida = await ValidarImpresoraAsync(configuracion.NombreImpresora);
+                    if (!esValida)
+                    {
+                        resultado.Errores.Add($"Impresora '{configuracion.NombreImpresora}' no disponible");
+                        return resultado;
+                    }
+                    resultado.ImpresoraUtilizada = configuracion.NombreImpresora;
+                }
+
+                // Generar vista previa
+                var tarjeta = await GenerarVistaPreviaAsync(abonado, plantilla);
+                if (tarjeta == null)
+                {
+                    resultado.Errores.Add("Error al generar vista previa de la tarjeta");
+                    return resultado;
+                }
+
+                // Configurar impresión
+                var printDialog = new System.Windows.Controls.PrintDialog();
+
+                // Mostrar diálogo si está configurado
+                if (configuracion.MostrarDialogoImpresion)
+                {
+                    if (printDialog.ShowDialog() != true)
+                    {
+                        resultado.Errores.Add("Impresión cancelada por el usuario");
+                        return resultado;
+                    }
+                }
+
+                // NUEVO: Usar tamaño de página basado en plantilla
+                var pageSize = CalcularTamañoPaginaOptimo(plantilla);
+                System.Diagnostics.Debug.WriteLine($"Usando tamaño personalizado: {pageSize.Width}x{pageSize.Height}");
+
+                // Crear documento de impresión
+                var document = new FixedDocument();
+                var page = new FixedPage
+                {
+                    Width = pageSize.Width,
+                    Height = pageSize.Height
+                };
+
+                // Aplicar escala y centrado
+                var escala = CalcularEscalaOptima(plantilla, pageSize);
+                tarjeta.Width = plantilla.Ancho * escala;
+                tarjeta.Height = plantilla.Alto * escala;
+
+                var marginX = (pageSize.Width - tarjeta.Width) / 2;
+                var marginY = (pageSize.Height - tarjeta.Height) / 2;
+
+                Canvas.SetLeft(tarjeta, Math.Max(0, marginX));
+                Canvas.SetTop(tarjeta, Math.Max(0, marginY));
+
+                page.Children.Add(tarjeta);
+
+                var pageContent = new PageContent();
+                ((IAddChild)pageContent).AddChild(page);
+                document.Pages.Add(pageContent);
+
+                // Imprimir múltiples copias si es necesario
+                for (int i = 0; i < configuracion.Copias; i++)
+                {
+                    printDialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator,
+                        $"Tarjeta de {abonado.NombreCompleto} ({i + 1}/{configuracion.Copias})");
+                }
+
+                // Guardar copia digital si está configurado
+                if (configuracion.GuardarCopia && !string.IsNullOrEmpty(configuracion.RutaCopia))
+                {
+                    await GuardarCopiaDigitalAsync(abonado, plantilla, configuracion.RutaCopia);
+                }
+
+                resultado.Exitoso = true;
+                resultado.TarjetasImpresas = configuracion.Copias;
+                resultado.Mensaje = "Tarjeta impresa correctamente";
+
+                // Actualizar estadísticas
+                await ActualizarEstadisticasPlantilla(plantilla.Id, "Impresa");
+
+            }
+            catch (Exception ex)
+            {
+                resultado.Exitoso = false;
+                resultado.Errores.Add(ex.Message);
+                resultado.Mensaje = "Error durante la impresión";
+                System.Diagnostics.Debug.WriteLine($"Error imprimiendo tarjeta: {ex.Message}");
+            }
+            finally
+            {
+                resultado.TiempoTranscurrido = DateTime.Now - inicio;
+            }
+
+            return resultado;
+        }
+
         public async Task<bool> ImprimirTarjetasAsync(List<Abonado> abonados, PlantillaTarjeta plantilla)
         {
             try
@@ -95,18 +256,38 @@ namespace ClubManager.Services
                 if (!abonados.Any())
                     return false;
 
+                var configuracion = _configuracionService.GetConfiguracion();
                 var printDialog = new System.Windows.Controls.PrintDialog();
-                if (printDialog.ShowDialog() != true)
-                    return false;
+
+                // Configurar impresora predeterminada si está disponible
+                if (!string.IsNullOrEmpty(configuracion.ConfiguracionImpresion.ImpresoraPredeterminada))
+                {
+                    var impresoras = GetImpresorasDisponibles();
+                    if (impresoras.Contains(configuracion.ConfiguracionImpresion.ImpresoraPredeterminada))
+                    {
+                        var printer = new System.Drawing.Printing.PrinterSettings();
+                        printer.PrinterName = configuracion.ConfiguracionImpresion.ImpresoraPredeterminada;
+                    }
+                }
+
+                // Mostrar diálogo si está configurado
+                if (configuracion.ConfiguracionImpresion.MostrarVistaPrevia)
+                {
+                    if (printDialog.ShowDialog() != true)
+                        return false;
+                }
+
+                // NUEVO: Calcular diseño óptimo para múltiples tarjetas
+                var pageSize = CalcularTamañoPaginaOptimo(plantilla);
+                var tarjetasPorPagina = CalcularTarjetasPorPagina(plantilla, pageSize, configuracion.ConfiguracionImpresion);
 
                 // Configurar documento para múltiples tarjetas
                 var document = new FixedDocument();
-                var tarjetasPorPagina = CalcularTarjetasPorPagina(plantilla, printDialog.PrintableAreaWidth, printDialog.PrintableAreaHeight);
 
                 for (int i = 0; i < abonados.Count; i += tarjetasPorPagina)
                 {
                     var abonadosPagina = abonados.Skip(i).Take(tarjetasPorPagina).ToList();
-                    var pagina = await CrearPaginaConTarjetasAsync(abonadosPagina, plantilla, printDialog.PrintableAreaWidth, printDialog.PrintableAreaHeight);
+                    var pagina = await CrearPaginaConTarjetasAsync(abonadosPagina, plantilla, pageSize, configuracion.ConfiguracionImpresion);
 
                     if (pagina != null)
                     {
@@ -118,20 +299,262 @@ namespace ClubManager.Services
 
                 // Imprimir documento
                 printDialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator,
-                    $"Tarjetas de abonados ({abonados.Count})");
+                    $"Tarjetas de Abonados ({abonados.Count} tarjetas)");
 
                 // Marcar como impresos
-                foreach (var abonado in abonados)
+                if (configuracion.ConfiguracionImpresion.MarcarComoImpresoAutomaticamente)
                 {
-                    abonado.Impreso = true;
+                    foreach (var abonado in abonados)
+                    {
+                        abonado.Impreso = true;
+                    }
                 }
+
+                // Guardar copias digitales
+                if (configuracion.ConfiguracionImpresion.GuardarCopiaDigital &&
+                    !string.IsNullOrEmpty(configuracion.ConfiguracionImpresion.RutaCopiasDigitales))
+                {
+                    foreach (var abonado in abonados)
+                    {
+                        await GuardarCopiaDigitalAsync(abonado, plantilla, configuracion.ConfiguracionImpresion.RutaCopiasDigitales);
+                    }
+                }
+
+                // Actualizar estadísticas
+                await ActualizarEstadisticasPlantilla(plantilla.Id, "Impresa", abonados.Count);
 
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error imprimiendo tarjetas múltiples: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error imprimiendo tarjetas: {ex.Message}");
                 return false;
+            }
+        }
+
+        // NUEVOS MÉTODOS PARA CALCULAR TAMAÑO AUTOMÁTICO
+
+        /// <summary>
+        /// Calcula el tamaño de página óptimo basado en las dimensiones de la plantilla
+        /// </summary>
+        private Size CalcularTamañoPaginaOptimo(PlantillaTarjeta plantilla)
+        {
+            try
+            {
+                // Convertir píxeles de la plantilla a puntos (1 punto = 1/72 pulgadas, 1 píxel = 1/96 pulgadas)
+                var anchoEnPuntos = ConvertirPixelsAPuntos(plantilla.Ancho);
+                var altoEnPuntos = ConvertirPixelsAPuntos(plantilla.Alto);
+
+                // Agregar márgenes mínimos (0.5 pulgadas = 36 puntos en cada lado)
+                var margenMinimo = 36.0;
+                var anchoTotal = anchoEnPuntos + (margenMinimo * 2);
+                var altoTotal = altoEnPuntos + (margenMinimo * 2);
+
+                // Verificar si cabe en tamaños estándar y ajustar si es necesario
+                var tamañosEstandar = new Dictionary<string, Size>
+                {
+                    { "A4", new Size(595, 842) },           // 210 x 297 mm
+                    { "Letter", new Size(612, 792) },       // 8.5 x 11 in
+                    { "A5", new Size(420, 595) },           // 148 x 210 mm
+                    { "Card", new Size(252, 360) },         // Tarjeta estándar ampliada
+                    { "Custom", new Size(anchoTotal, altoTotal) }
+                };
+
+                // Buscar el tamaño estándar más pequeño que contenga la tarjeta
+                foreach (var tamaño in tamañosEstandar)
+                {
+                    if (tamaño.Value.Width >= anchoTotal && tamaño.Value.Height >= altoTotal)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Usando tamaño {tamaño.Key}: {tamaño.Value.Width}x{tamaño.Value.Height}");
+                        return tamaño.Value;
+                    }
+                }
+
+                // Si no cabe en ningún estándar, usar tamaño personalizado
+                System.Diagnostics.Debug.WriteLine($"Usando tamaño personalizado: {anchoTotal}x{altoTotal}");
+                return new Size(anchoTotal, altoTotal);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error calculando tamaño de página: {ex.Message}");
+                // Fallback a A4
+                return new Size(595, 842);
+            }
+        }
+
+        /// <summary>
+        /// Calcula la escala óptima para la tarjeta en la página
+        /// </summary>
+        private double CalcularEscalaOptima(PlantillaTarjeta plantilla, Size pageSize)
+        {
+            try
+            {
+                // Calcular área disponible (restando márgenes)
+                var margen = 36.0; // 0.5 pulgadas en puntos
+                var areaDisponibleAncho = pageSize.Width - (margen * 2);
+                var areaDisponibleAlto = pageSize.Height - (margen * 2);
+
+                // Convertir dimensiones de plantilla a puntos
+                var plantillaAnchoEnPuntos = ConvertirPixelsAPuntos(plantilla.Ancho);
+                var plantillaAltoEnPuntos = ConvertirPixelsAPuntos(plantilla.Alto);
+
+                // Calcular escalas posibles
+                var escalaX = areaDisponibleAncho / plantillaAnchoEnPuntos;
+                var escalaY = areaDisponibleAlto / plantillaAltoEnPuntos;
+
+                // Usar la menor escala para mantener proporciones
+                var escala = Math.Min(escalaX, escalaY);
+
+                // Limitar escala máxima para evitar tarjetas gigantes
+                escala = Math.Min(escala, 2.0);
+
+                // Asegurar escala mínima razonable
+                escala = Math.Max(escala, 0.5);
+
+                System.Diagnostics.Debug.WriteLine($"Escala calculada: {escala:F2} (escalaX: {escalaX:F2}, escalaY: {escalaY:F2})");
+                return escala;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error calculando escala: {ex.Message}");
+                return 1.0; // Escala por defecto
+            }
+        }
+
+        /// <summary>
+        /// Calcula cuántas tarjetas caben por página
+        /// </summary>
+        private int CalcularTarjetasPorPagina(PlantillaTarjeta plantilla, Size pageSize, ConfiguracionImpresionTarjetas config)
+        {
+            try
+            {
+                // Si se especifica un número fijo, usarlo
+                if (config.TarjetasPorPagina > 0 && config.TarjetasPorPagina <= 20)
+                {
+                    return config.TarjetasPorPagina;
+                }
+
+                // Calcular automáticamente
+                var margen = 36.0; // 0.5 pulgadas
+                var espaciadoH = config.EspaciadoHorizontal * 2.83; // mm a puntos
+                var espaciadoV = config.EspaciadoVertical * 2.83;
+
+                var areaAncho = pageSize.Width - (margen * 2);
+                var areaAlto = pageSize.Height - (margen * 2);
+
+                var tarjetaAnchoEnPuntos = ConvertirPixelsAPuntos(plantilla.Ancho);
+                var tarjetaAltoEnPuntos = ConvertirPixelsAPuntos(plantilla.Alto);
+
+                var tarjetasPorFila = Math.Max(1, (int)((areaAncho + espaciadoH) / (tarjetaAnchoEnPuntos + espaciadoH)));
+                var tarjetasPorColumna = Math.Max(1, (int)((areaAlto + espaciadoV) / (tarjetaAltoEnPuntos + espaciadoV)));
+
+                var total = tarjetasPorFila * tarjetasPorColumna;
+
+                System.Diagnostics.Debug.WriteLine($"Tarjetas por página calculadas: {total} ({tarjetasPorFila}x{tarjetasPorColumna})");
+                return Math.Min(total, 20); // Máximo 20 por página
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error calculando tarjetas por página: {ex.Message}");
+                return 1;
+            }
+        }
+
+        private async Task GuardarCopiaDigitalAsync(Abonado abonado, PlantillaTarjeta plantilla, string rutaBase)
+        {
+            try
+            {
+                // Crear directorio si no existe
+                Directory.CreateDirectory(rutaBase);
+
+                // Generar nombre de archivo único
+                var nombreArchivo = $"Tarjeta_{abonado.NumeroSocio}_{abonado.Nombre}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                var rutaCompleta = Path.Combine(rutaBase, nombreArchivo);
+
+                // Generar imagen de la tarjeta
+                var imagen = await GenerarImagenTarjetaAsync(abonado, plantilla);
+                if (imagen != null)
+                {
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(imagen));
+
+                    using (var stream = new FileStream(rutaCompleta, FileMode.Create))
+                    {
+                        encoder.Save(stream);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error guardando copia digital: {ex.Message}");
+            }
+        }
+
+        private async Task<FixedPage> CrearPaginaConTarjetasAsync(List<Abonado> abonados, PlantillaTarjeta plantilla, Size pageSize, ConfiguracionImpresionTarjetas config)
+        {
+            try
+            {
+                var page = new FixedPage
+                {
+                    Width = pageSize.Width,
+                    Height = pageSize.Height
+                };
+
+                var margen = 36.0;
+                var espaciadoH = config.EspaciadoHorizontal * 2.83; // mm a puntos
+                var espaciadoV = config.EspaciadoVertical * 2.83;
+
+                var tarjetaAnchoEnPuntos = ConvertirPixelsAPuntos(plantilla.Ancho);
+                var tarjetaAltoEnPuntos = ConvertirPixelsAPuntos(plantilla.Alto);
+
+                // Calcular cuántas tarjetas caben por fila y columna
+                var areaAncho = pageSize.Width - (margen * 2);
+                var areaAlto = pageSize.Height - (margen * 2);
+
+                var tarjetasPorFila = Math.Max(1, (int)((areaAncho + espaciadoH) / (tarjetaAnchoEnPuntos + espaciadoH)));
+                var tarjetasPorColumna = Math.Max(1, (int)((areaAlto + espaciadoV) / (tarjetaAltoEnPuntos + espaciadoV)));
+
+                for (int i = 0; i < abonados.Count && i < (tarjetasPorFila * tarjetasPorColumna); i++)
+                {
+                    var fila = i / tarjetasPorFila;
+                    var columna = i % tarjetasPorFila;
+
+                    var x = margen + (columna * (tarjetaAnchoEnPuntos + espaciadoH));
+                    var y = margen + (fila * (tarjetaAltoEnPuntos + espaciadoV));
+
+                    var tarjeta = await GenerarVistaPreviaAsync(abonados[i], plantilla);
+                    if (tarjeta != null)
+                    {
+                        tarjeta.Width = tarjetaAnchoEnPuntos;
+                        tarjeta.Height = tarjetaAltoEnPuntos;
+
+                        Canvas.SetLeft(tarjeta, x);
+                        Canvas.SetTop(tarjeta, y);
+
+                        page.Children.Add(tarjeta);
+                    }
+                }
+
+                return page;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creando página con tarjetas: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task ActualizarEstadisticasPlantilla(string plantillaId, string accion, int cantidad = 1)
+        {
+            try
+            {
+                // Aquí se podría implementar actualización de estadísticas
+                // por ahora solo log
+                System.Diagnostics.Debug.WriteLine($"Estadísticas: Plantilla {plantillaId} - {accion} - Cantidad: {cantidad}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error actualizando estadísticas: {ex.Message}");
             }
         }
 
@@ -146,39 +569,29 @@ namespace ClubManager.Services
                     Background = Brushes.White
                 };
 
-                // Agregar borde a la tarjeta
-                var border = new Rectangle
-                {
-                    Width = plantilla.Ancho,
-                    Height = plantilla.Alto,
-                    Stroke = Brushes.LightGray,
-                    StrokeThickness = 1,
-                    Fill = Brushes.White
-                };
-                canvas.Children.Add(border);
+                // Ordenar elementos por ZIndex
+                var elementosOrdenados = plantilla.Elementos.OrderBy(e => e.ZIndex).ToList();
 
-                // Procesar elementos de la plantilla
-                foreach (var elemento in plantilla.Elementos.OrderBy(e => e.ZIndex))
+                foreach (var elemento in elementosOrdenados)
                 {
-                    if (!elemento.Visible)
-                        continue;
+                    if (!elemento.Visible) continue;
 
-                    var uiElement = await CrearElementoUIAsync(elemento, abonado);
-                    if (uiElement != null)
+                    var elementoUI = await CrearElementoUIAsync(elemento, abonado);
+                    if (elementoUI != null)
                     {
-                        Canvas.SetLeft(uiElement, elemento.X);
-                        Canvas.SetTop(uiElement, elemento.Y);
-                        Canvas.SetZIndex(uiElement, elemento.ZIndex);
+                        Canvas.SetLeft(elementoUI, elemento.X);
+                        Canvas.SetTop(elementoUI, elemento.Y);
+                        Canvas.SetZIndex(elementoUI, elemento.ZIndex);
 
                         // Aplicar transformaciones
                         if (elemento.Rotacion != 0 || elemento.Opacidad != 1.0)
                         {
                             var transform = new RotateTransform(elemento.Rotacion);
-                            uiElement.RenderTransform = transform;
-                            uiElement.Opacity = elemento.Opacidad;
+                            elementoUI.RenderTransform = transform;
+                            elementoUI.Opacity = elemento.Opacidad;
                         }
 
-                        canvas.Children.Add(uiElement);
+                        canvas.Children.Add(elementoUI);
                     }
                 }
 
@@ -273,6 +686,9 @@ namespace ClubManager.Services
         {
             try
             {
+                if (string.IsNullOrEmpty(nombreImpresora))
+                    return false;
+
                 var impresoras = GetImpresorasDisponibles();
                 return impresoras.Contains(nombreImpresora);
             }
@@ -298,7 +714,7 @@ namespace ClubManager.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando elemento UI: {ex.Message}");
-                return null;
+                return CrearElementoError(elemento, "Error al crear elemento");
             }
         }
 
@@ -333,7 +749,9 @@ namespace ClubManager.Services
             try
             {
                 if (string.IsNullOrEmpty(elemento.RutaImagen) || !File.Exists(elemento.RutaImagen))
-                    return null;
+                {
+                    return CrearElementoError(elemento, "Imagen no encontrada");
+                }
 
                 var image = new Image
                 {
@@ -344,28 +762,22 @@ namespace ClubManager.Services
 
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
-                bitmap.UriSource = new Uri(elemento.RutaImagen);
+                bitmap.UriSource = new Uri(elemento.RutaImagen, UriKind.Absolute);
                 bitmap.EndInit();
                 image.Source = bitmap;
 
                 // Aplicar bordes redondeados si es necesario
-                if (elemento.Redondez > 0)
+                if (elemento.Redondez > 0 || elemento.GrosorBorde > 0)
                 {
                     var border = new Border
                     {
                         Width = elemento.Ancho,
                         Height = elemento.Alto,
                         CornerRadius = new CornerRadius(elemento.Redondez),
-                        Child = image,
-                        ClipToBounds = true
+                        BorderBrush = new SolidColorBrush(elemento.ColorBorde),
+                        BorderThickness = new Thickness(elemento.GrosorBorde),
+                        Child = image
                     };
-
-                    if (elemento.GrosorBorde > 0)
-                    {
-                        border.BorderBrush = new SolidColorBrush(elemento.ColorBorde);
-                        border.BorderThickness = new Thickness(elemento.GrosorBorde);
-                    }
-
                     return border;
                 }
 
@@ -374,7 +786,7 @@ namespace ClubManager.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando imagen: {ex.Message}");
-                return null;
+                return CrearElementoError(elemento, "Error al cargar imagen");
             }
         }
 
@@ -382,47 +794,55 @@ namespace ClubManager.Services
         {
             try
             {
-                var valor = ObtenerValorCampo(elemento.CampoOrigen, abonado);
+                var valor = ObtenerValorCampo(abonado, elemento.CampoOrigen);
                 if (string.IsNullOrEmpty(valor))
-                    return null;
-
-                var container = new Border
                 {
-                    Width = elemento.Ancho,
-                    Height = elemento.Alto,
-                    Background = new SolidColorBrush(elemento.ColorFondo),
-                    BorderBrush = Brushes.LightGray,
-                    BorderThickness = new Thickness(0.5)
-                };
+                    return CrearElementoError(elemento, "Sin datos para código");
+                }
 
                 var stackPanel = new StackPanel
                 {
-                    Orientation = Orientation.Vertical,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Width = elemento.Ancho,
+                    Height = elemento.Alto,
+                    Background = new SolidColorBrush(elemento.ColorFondo)
                 };
 
-                // Generar código de barras
-                var barcodeImage = BarcodeGenerator.GenerateBarcode(valor, elemento.Ancho - 4,
-                    elemento.MostrarTexto ? elemento.Alto - 15 : elemento.Alto - 4, elemento.TipoCodigo);
-
-                if (barcodeImage != null)
+                // Simulación simple de código de barras (rectángulos)
+                var barrasCanvas = new Canvas
                 {
-                    var image = new Image
+                    Height = elemento.Alto * 0.7,
+                    Background = new SolidColorBrush(elemento.ColorFondo)
+                };
+
+                // Generar barras simples basadas en el valor
+                var anchoTotal = elemento.Ancho - 10;
+                var numeroBarras = Math.Min(valor.Length * 6, 50);
+                var anchoBarra = anchoTotal / numeroBarras;
+
+                for (int i = 0; i < numeroBarras; i++)
+                {
+                    var esBarra = (valor.GetHashCode() + i) % 3 != 0;
+                    if (esBarra)
                     {
-                        Source = barcodeImage,
-                        Stretch = Stretch.Fill,
-                        Margin = new Thickness(2)
-                    };
-                    stackPanel.Children.Add(image);
+                        var barra = new Rectangle
+                        {
+                            Width = anchoBarra * 0.8,
+                            Height = barrasCanvas.Height,
+                            Fill = Brushes.Black
+                        };
+                        Canvas.SetLeft(barra, i * anchoBarra + 5);
+                        barrasCanvas.Children.Add(barra);
+                    }
                 }
 
-                // Agregar texto si está habilitado
+                stackPanel.Children.Add(barrasCanvas);
+
+                // Agregar texto si está configurado
                 if (elemento.MostrarTexto)
                 {
-                    var textoFormateado = string.IsNullOrEmpty(elemento.FormatoTexto)
-                        ? valor
-                        : string.Format(elemento.FormatoTexto, valor);
+                    var textoFormateado = !string.IsNullOrEmpty(elemento.FormatoTexto)
+                        ? string.Format(elemento.FormatoTexto, valor)
+                        : valor;
 
                     var textBlock = new TextBlock
                     {
@@ -430,20 +850,18 @@ namespace ClubManager.Services
                         FontFamily = new FontFamily(elemento.FontFamily),
                         FontSize = elemento.FontSize,
                         Foreground = new SolidColorBrush(elemento.ColorTexto),
-                        HorizontalAlignment = HorizontalAlignment.Center,
                         TextAlignment = TextAlignment.Center,
-                        Margin = new Thickness(0, 1, 0, 0)
+                        Height = elemento.Alto * 0.3
                     };
                     stackPanel.Children.Add(textBlock);
                 }
 
-                container.Child = stackPanel;
-                return container;
+                return stackPanel;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando código de barras: {ex.Message}");
-                return CrearElementoError(elemento, "Error en código");
+                return CrearElementoError(elemento, "Error en código de barras");
             }
         }
 
@@ -451,9 +869,7 @@ namespace ClubManager.Services
         {
             try
             {
-                var valor = ObtenerValorCampo(elemento.CampoOrigen, abonado);
-
-                // Aplicar formato si es necesario
+                var valor = ObtenerValorCampo(abonado, elemento.CampoOrigen);
                 var textoFinal = FormatearValor(valor, elemento);
 
                 var textBlock = new TextBlock
@@ -481,32 +897,32 @@ namespace ClubManager.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error creando campo dinámico: {ex.Message}");
-                return CrearElementoError(elemento, "Error en campo");
+                return CrearElementoError(elemento, "Error en campo dinámico");
             }
         }
 
-        private string ObtenerValorCampo(string campo, Abonado abonado)
+        private string ObtenerValorCampo(Abonado abonado, string campo)
         {
             try
             {
                 return campo switch
                 {
-                    "NombreCompleto" => abonado.NombreCompleto,
-                    "Nombre" => abonado.Nombre,
-                    "Apellidos" => abonado.Apellidos,
                     "NumeroSocio" => abonado.NumeroSocio.ToString(),
+                    "Nombre" => abonado.Nombre ?? "",
+                    "Apellidos" => abonado.Apellidos ?? "",
+                    "NombreCompleto" => abonado.NombreCompleto ?? "",
                     "DNI" => abonado.DNI ?? "",
                     "Telefono" => abonado.Telefono ?? "",
                     "Email" => abonado.Email ?? "",
                     "Direccion" => abonado.Direccion ?? "",
+                    "FechaNacimiento" => abonado.FechaNacimiento.ToString("dd/MM/yyyy"),
                     "CodigoBarras" => abonado.CodigoBarras ?? "",
                     "TallaCamiseta" => abonado.TallaCamiseta ?? "",
-                    "Estado" => abonado.EstadoTexto,
-                    "FechaNacimiento" => abonado.FechaNacimiento.ToString("dd/MM/yyyy"),
+                    "Estado" => abonado.Estado.ToString(),
                     "FechaCreacion" => abonado.FechaCreacion.ToString("dd/MM/yyyy"),
+                    "Gestor" => abonado.Gestor?.Nombre ?? "",
                     "Peña" => abonado.Peña?.Nombre ?? "",
                     "TipoAbono" => abonado.TipoAbono?.Nombre ?? "",
-                    "Gestor" => abonado.Gestor?.Nombre ?? "",
                     "PrecioAbono" => abonado.TipoAbono?.Precio.ToString("C") ?? "",
                     "Observaciones" => abonado.Observaciones ?? "",
                     _ => ""
@@ -580,187 +996,10 @@ namespace ClubManager.Services
             return border;
         }
 
-        private async Task<FixedPage> CrearPaginaConTarjetasAsync(List<Abonado> abonados, PlantillaTarjeta plantilla,
-            double anchoPagina, double altoPagina)
-        {
-            try
-            {
-                var page = new FixedPage
-                {
-                    Width = anchoPagina,
-                    Height = altoPagina
-                };
-
-                var tarjetasPorFila = (int)(anchoPagina / (plantilla.Ancho + 10)); // 10px de margen
-                var tarjetasPorColumna = (int)(altoPagina / (plantilla.Alto + 10));
-
-                var margenX = (anchoPagina - (tarjetasPorFila * (plantilla.Ancho + 10))) / 2;
-                var margenY = (altoPagina - (tarjetasPorColumna * (plantilla.Alto + 10))) / 2;
-
-                for (int i = 0; i < abonados.Count && i < (tarjetasPorFila * tarjetasPorColumna); i++)
-                {
-                    var fila = i / tarjetasPorFila;
-                    var columna = i % tarjetasPorFila;
-
-                    var tarjeta = await GenerarVistaPreviaAsync(abonados[i], plantilla);
-                    if (tarjeta != null)
-                    {
-                        var x = margenX + columna * (plantilla.Ancho + 10);
-                        var y = margenY + fila * (plantilla.Alto + 10);
-
-                        FixedPage.SetLeft(tarjeta, x);
-                        FixedPage.SetTop(tarjeta, y);
-                        page.Children.Add(tarjeta);
-                    }
-                }
-
-                return page;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error creando página con tarjetas: {ex.Message}");
-                return null;
-            }
-        }
-
-        private int CalcularTarjetasPorPagina(PlantillaTarjeta plantilla, double anchoPagina, double altoPagina)
-        {
-            try
-            {
-                var tarjetasPorFila = (int)(anchoPagina / (plantilla.Ancho + 10)); // 10px de margen
-                var tarjetasPorColumna = (int)(altoPagina / (plantilla.Alto + 10));
-                return Math.Max(1, tarjetasPorFila * tarjetasPorColumna);
-            }
-            catch
-            {
-                return 1;
-            }
-        }
-
         private double ConvertirPixelsAPuntos(double pixels)
         {
             // 1 punto = 1/72 pulgadas, 1 pixel = 1/96 pulgadas
             return pixels * 72.0 / 96.0;
-        }
-    }
-
-    /// <summary>
-    /// Configuración de impresión personalizada
-    /// </summary>
-    public class ConfiguracionImpresionTarjetas
-    {
-        public string NombreImpresora { get; set; } = "";
-        public double MargenSuperior { get; set; } = 10;
-        public double MargenInferior { get; set; } = 10;
-        public double MargenIzquierdo { get; set; } = 10;
-        public double MargenDerecho { get; set; } = 10;
-        public int Calidad { get; set; } = 300; // DPI
-        public bool ImpresionColor { get; set; } = true;
-        public string TamañoPapel { get; set; } = "A4";
-        public bool AjustarTamañoAutomaticamente { get; set; } = true;
-        public int MaximasTarjetasPorPagina { get; set; } = 10;
-        public double EspaciadoHorizontal { get; set; } = 5;
-        public double EspaciadoVertical { get; set; } = 5;
-        public bool MostrarBordeCorte { get; set; } = false;
-        public bool ImprimirEnDuplicado { get; set; } = false; // Para hacer copias de seguridad
-    }
-
-    /// <summary>
-    /// Resultado de operación de impresión
-    /// </summary>
-    public class ResultadoImpresion
-    {
-        public bool Exitoso { get; set; }
-        public string Mensaje { get; set; } = "";
-        public int TarjetasImpresas { get; set; }
-        public int TarjetasConError { get; set; }
-        public List<string> Errores { get; set; } = new();
-        public TimeSpan TiempoTranscurrido { get; set; }
-        public DateTime FechaImpresion { get; set; } = DateTime.Now;
-    }
-
-    /// <summary>
-    /// Extensiones para facilitar la impresión
-    /// </summary>
-    public static class CardPrintExtensions
-    {
-        /// <summary>
-        /// Imprime una tarjeta con configuración personalizada
-        /// </summary>
-        public static async Task<ResultadoImpresion> ImprimirConConfiguracionAsync(
-            this ICardPrintService service,
-            Abonado abonado,
-            PlantillaTarjeta plantilla,
-            ConfiguracionImpresionTarjetas configuracion)
-        {
-            var inicio = DateTime.Now;
-            var resultado = new ResultadoImpresion();
-
-            try
-            {
-                // Validar impresora
-                if (!string.IsNullOrEmpty(configuracion.NombreImpresora))
-                {
-                    var esValida = await service.ValidarImpresoraAsync(configuracion.NombreImpresora);
-                    if (!esValida)
-                    {
-                        resultado.Errores.Add($"Impresora '{configuracion.NombreImpresora}' no disponible");
-                        return resultado;
-                    }
-                }
-
-                // Imprimir
-                var exitoso = await service.ImprimirTarjetaAsync(abonado, plantilla);
-
-                resultado.Exitoso = exitoso;
-                resultado.TarjetasImpresas = exitoso ? 1 : 0;
-                resultado.TarjetasConError = exitoso ? 0 : 1;
-                resultado.Mensaje = exitoso ? "Tarjeta impresa correctamente" : "Error al imprimir tarjeta";
-
-                if (!exitoso)
-                {
-                    resultado.Errores.Add("Error durante la impresión");
-                }
-            }
-            catch (Exception ex)
-            {
-                resultado.Exitoso = false;
-                resultado.Errores.Add(ex.Message);
-                resultado.Mensaje = "Error inesperado durante la impresión";
-            }
-            finally
-            {
-                resultado.TiempoTranscurrido = DateTime.Now - inicio;
-            }
-
-            return resultado;
-        }
-
-        /// <summary>
-        /// Valida que una plantilla sea apta para impresión
-        /// </summary>
-        public static bool EsAptaParaImpresion(this PlantillaTarjeta plantilla)
-        {
-            if (plantilla == null)
-                return false;
-
-            // Verificar dimensiones mínimas
-            if (plantilla.Ancho < 50 || plantilla.Alto < 30)
-                return false;
-
-            // Verificar que tenga al menos un elemento
-            if (!plantilla.Elementos.Any())
-                return false;
-
-            // Verificar que los elementos estén dentro de los límites
-            foreach (var elemento in plantilla.Elementos)
-            {
-                if (elemento.X + elemento.Ancho > plantilla.Ancho ||
-                    elemento.Y + elemento.Alto > plantilla.Alto)
-                    return false;
-            }
-
-            return true;
         }
     }
 }

@@ -111,11 +111,11 @@
                         <Button Content="📁 Seleccionar Logo" 
                                 Style="{StaticResource ModernButton}"
                                 Command="{Binding SelectLogoCommand}"
-                                Width="150" Margin="0,0,10,0"/>
+                                Width="180" Margin="0,0,10,0"/>
                         <Button Content="🗑️ Quitar Logo" 
                                 Style="{StaticResource DangerButton}"
                                 Command="{Binding RemoveLogoCommand}"
-                                Width="120"
+                                Width="140"
                                 Visibility="{Binding LogoClub}"/>
                     </StackPanel>
 
@@ -127,12 +127,155 @@
                         <Button Content="🛡️ Seleccionar Escudo" 
                                 Style="{StaticResource ModernButton}"
                                 Command="{Binding SelectEscudoCommand}"
-                                Width="150" Margin="0,0,10,0"/>
+                                Width="180" Margin="0,0,10,0"/>
                         <Button Content="🗑️ Quitar Escudo" 
                                 Style="{StaticResource DangerButton}"
                                 Command="{Binding RemoveEscudoCommand}"
-                                Width="120"
+                                Width="140"
                                 Visibility="{Binding RutaEscudo}"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Configuración de Impresión -->
+            <GroupBox Header="🖨️ Configuración de Impresión" Margin="0,0,0,20">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Impresora Predeterminada -->
+                    <Label Grid.Row="0" Grid.Column="0" 
+                           Content="Impresora Predeterminada:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" 
+                              ItemsSource="{Binding ImpresorasDisponibles}"
+                              SelectedItem="{Binding ImpresoraPredeterminada}"
+                              Style="{StaticResource ModernComboBox}"
+                              Margin="0,0,10,10"/>
+                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
+                        <Button Content="🔄" 
+                                Style="{StaticResource ModernButton}"
+                                Padding="0"
+                                Command="{Binding RefrescarImpresorasCommand}"
+                                ToolTip="Refrescar lista de impresoras"
+                                Width="30" Height="30" Margin="0,0,5,0"/>
+                        <Button Content="🧪" 
+                                Style="{StaticResource InfoButton}"
+                                Padding="0"
+                                Command="{Binding ProbarImpresoraCommand}"
+                                ToolTip="Probar impresora"
+                                Width="30" Height="30" Margin="0,0,5,0"/>
+                        <Button Content="📄" 
+                                Style="{StaticResource AccentButton}"
+                                Command="{Binding TestImpresionCommand}"
+                                ToolTip="Imprimir prueba"
+                                Width="30" Height="30"/>
+                    </StackPanel>
+
+                    <!-- Tamaño de Papel -->
+                    <Label Grid.Row="1" Grid.Column="0" 
+                           Content="Tamaño de Papel:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" 
+                              ItemsSource="{Binding TamañosPapel}"
+                              SelectedItem="{Binding TamañoPapelSeleccionado}"
+                              DisplayMemberPath="Display"
+                              Style="{StaticResource ModernComboBox}"
+                              Margin="0,0,10,10"/>
+
+                    <!-- Calidad de Impresión -->
+                    <Label Grid.Row="2" Grid.Column="0" 
+                           Content="Calidad de Impresión:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1" 
+                              ItemsSource="{Binding CalidadesImpresion}"
+                              SelectedItem="{Binding CalidadSeleccionada}"
+                              DisplayMemberPath="Display"
+                              Style="{StaticResource ModernComboBox}"
+                              Margin="0,0,10,10"/>
+
+                    <!-- Configuración de Tarjetas por Página -->
+                    <Label Grid.Row="3" Grid.Column="0" 
+                           Content="Tarjetas por Página:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBox Text="{Binding TarjetasPorPagina}" 
+                                 Style="{StaticResource ModernTextBox}"
+                                 Width="80" Margin="0,0,10,0"/>
+                        <TextBlock Text="(1-20)" 
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Espaciado -->
+                    <Label Grid.Row="4" Grid.Column="0" 
+                           Content="Espaciado (mm):" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                        <Label Content="Horizontal:" Style="{StaticResource ModernLabel}" Width="80"/>
+                        <TextBox Text="{Binding EspaciadoHorizontal}" 
+                                 Style="{StaticResource ModernTextBox}"
+                                 Width="60" Margin="0,0,10,0"/>
+                        <Label Content="Vertical:" Style="{StaticResource ModernLabel}" Width="60"/>
+                        <TextBox Text="{Binding EspaciadoVertical}" 
+                                 Style="{StaticResource ModernTextBox}"
+                                 Width="60"/>
+                    </StackPanel>
+
+                    <!-- Opciones -->
+                    <Label Grid.Row="5" Grid.Column="0" 
+                           Content="Opciones:" 
+                           Style="{StaticResource ModernLabel}"/>
+                    <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,0,0,10">
+                        <CheckBox Content="🌈 Impresión a color" 
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsChecked="{Binding ImpresionColor}"
+                                  Margin="0,0,0,5"/>
+                        <CheckBox Content="📄 Mostrar vista previa" 
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsChecked="{Binding MostrarVistaPrevia}"
+                                  Margin="0,0,0,5"/>
+                        <CheckBox Content="✅ Marcar como impreso automáticamente" 
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsChecked="{Binding MarcarComoImpresoAutomaticamente}"
+                                  Margin="0,0,0,5"/>
+                        <CheckBox Content="💾 Guardar copia digital" 
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsChecked="{Binding GuardarCopiaDigital}"/>
+                    </StackPanel>
+
+                    <!-- Ruta de Copias Digitales -->
+                    <Label Grid.Row="6" Grid.Column="0" 
+                           Content="Ruta Copias Digitales:" 
+                           Style="{StaticResource ModernLabel}"
+                           Visibility="{Binding MostrarRutaCopias, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <StackPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" 
+                                Orientation="Horizontal" 
+                                Visibility="{Binding MostrarRutaCopias, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Margin="0,0,0,10">
+                        <TextBox Text="{Binding RutaCopiasDigitales}" 
+                                 Style="{StaticResource ModernTextBox}"
+                                 IsReadOnly="True"
+                                 Width="300" Margin="0,0,10,0"/>
+                        <Button Content="📁" 
+                                Style="{StaticResource ModernButton}"
+                                Padding="0"
+                                Command="{Binding ConfigurarRutaCopiasCommand}"
+                                ToolTip="Seleccionar carpeta"
+                                Width="30" Height="30"/>
                     </StackPanel>
                 </Grid>
             </GroupBox>

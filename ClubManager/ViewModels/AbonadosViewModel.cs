@@ -17,6 +17,7 @@ namespace ClubManager.ViewModels
     {
         private readonly ClubDbContext _dbContext;
         private readonly ILicenseService _licenseService;
+        private readonly IConfiguracionService _configuracionService;
 
         private ObservableCollection<AbonadoSelectableViewModel> _abonados;
         private ObservableCollection<AbonadoSelectableViewModel> _abonadosFiltered;
@@ -44,6 +45,7 @@ namespace ClubManager.ViewModels
         {
             _dbContext = new ClubDbContext();
             _licenseService = new LicenseService();
+            _configuracionService = new ConfiguracionService();
 
             _abonados = new ObservableCollection<AbonadoSelectableViewModel>();
             _abonadosFiltered = new ObservableCollection<AbonadoSelectableViewModel>();
@@ -176,9 +178,12 @@ namespace ClubManager.ViewModels
         public ICommand MarkSelectedAsNotPrintedCommand { get; private set; } = null!;
         public ICommand ClearSelectionCommand { get; private set; } = null!;
 
-        // Comandos Impresion ATarjetas
+        // Comandos Impresion de Tarjetas
         public ICommand PrintCardCommand { get; private set; } = null!;
         public ICommand PrintSelectedCardsCommand { get; private set; } = null!;
+
+        // Comando NFC
+        public ICommand WriteNfcCommand { get; private set; } = null!;
 
         private void InitializeCommands()
         {
@@ -192,6 +197,7 @@ namespace ClubManager.ViewModels
             PrintSelectedCommand = new RelayCommand(PrintSelected, () => SelectedAbonado != null);
             PrintCardCommand = new RelayCommand<AbonadoSelectableViewModel>(PrintCard, a => a != null);
             PrintSelectedCardsCommand = new RelayCommand(PrintSelectedCards, () => HasSelectedItems);
+            WriteNfcCommand = new RelayCommand<AbonadoSelectableViewModel>(WriteNfc, a => a != null);
 
             // Comandos múltiples
             DeleteSelectedCommand = new RelayCommand(DeleteSelected, () => CanEdit && HasSelectedItems);
@@ -229,6 +235,21 @@ namespace ClubManager.ViewModels
 
             try
             {
+                // Verificar si está impreso y mostrar advertencia
+                if (abonadoVm.Abonado.Impreso)
+                {
+                    var result = MessageBox.Show(
+                        $"El abonado {abonadoVm.Abonado.NombreCompleto} ya tiene su tarjeta impresa.\n\n" +
+                        "Si modifica los datos, es recomendable reimprimir la tarjeta.\n\n" +
+                        "¿Desea continuar con la edición?",
+                        "Tarjeta Ya Impresa",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (result != MessageBoxResult.Yes)
+                        return;
+                }
+
                 var editWindow = new AbonadoEditWindow(abonadoVm.Abonado);
                 if (editWindow.ShowDialog() == true)
                 {
@@ -340,8 +361,15 @@ namespace ClubManager.ViewModels
         {
             if (SelectedAbonado?.Abonado == null) return;
 
-            MessageBox.Show($"Imprimir tarjeta de {SelectedAbonado.Abonado.NombreCompleto} - Próximamente", "Información",
-                          MessageBoxButton.OK, MessageBoxImage.Information);
+            PrintCard(SelectedAbonado);
+        }
+
+        private void WriteNfc(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            MessageBox.Show($"Funcionalidad NFC para {abonadoVm.Abonado.NombreCompleto} - Próximamente",
+                          "NFC", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         #endregion
@@ -755,16 +783,49 @@ namespace ClubManager.ViewModels
                 }
 
                 // Crear servicio de impresión
-                var printService = new CardPrintService(templateService);
+                var printService = new CardPrintService(templateService, _configuracionService);
 
-                // Mostrar vista previa antes de imprimir
-                var previewWindow = new CardPreviewWindow(abonadoVm.Abonado, plantilla, printService);
-                previewWindow.Owner = Application.Current.MainWindow;
+                // Obtener configuración actual
+                var configuracion = _configuracionService.GetConfiguracion();
 
-                if (previewWindow.ShowDialog() == true)
+                // Crear configuración específica de impresión
+                var configuracionImpresion = new ConfiguracionImpresionEspecifica
                 {
-                    // El usuario confirmó la impresión desde la vista previa
+                    NombreImpresora = configuracion.ConfiguracionImpresion.ImpresoraPredeterminada,
+                    TamañoPapel = configuracion.ConfiguracionImpresion.TamañoPapel,
+                    ImpresionColor = configuracion.ConfiguracionImpresion.ImpresionColor,
+                    Calidad = configuracion.ConfiguracionImpresion.Calidad,
+                    Copias = 1,
+                    MostrarDialogoImpresion = configuracion.ConfiguracionImpresion.MostrarVistaPrevia,
+                    GuardarCopia = configuracion.ConfiguracionImpresion.GuardarCopiaDigital,
+                    RutaCopia = configuracion.ConfiguracionImpresion.RutaCopiasDigitales
+                };
+
+                // Imprimir
+                var resultado = await printService.ImprimirTarjetaAsync(abonadoVm.Abonado, plantilla, configuracionImpresion);
+
+                if (resultado.Exitoso)
+                {
+                    // Marcar como impreso solo si está configurado
+                    if (configuracion.ConfiguracionImpresion.MarcarComoImpresoAutomaticamente)
+                    {
+                        abonadoVm.Abonado.Impreso = true;
+                        await _dbContext.SaveChangesAsync();
+                        abonadoVm.NotifyPropertyChanged(nameof(abonadoVm.Abonado));
+                    }
+
                     await LogAction($"Impresa tarjeta de {abonadoVm.Abonado.NombreCompleto}");
+
+                    MessageBox.Show($"✅ Tarjeta impresa correctamente!\n\n" +
+                                   $"• Abonado: {abonadoVm.Abonado.NombreCompleto}\n" +
+                                   $"• Tiempo: {resultado.TiempoTranscurrido.TotalSeconds:F1} segundos",
+                                   "Impresión Exitosa", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    var errores = string.Join("\n• ", resultado.Errores);
+                    MessageBox.Show($"❌ Error al imprimir tarjeta:\n\n• {errores}",
+                                   "Error en Impresión", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             catch (Exception ex)
@@ -792,8 +853,7 @@ namespace ClubManager.ViewModels
                     return;
                 }
 
-
-                var printService = new CardPrintService(templateService);
+                var printService = new CardPrintService(templateService, _configuracionService);
                 var abonados = selectedItems.Select(vm => vm.Abonado).ToList();
 
                 var result = MessageBox.Show(
@@ -809,10 +869,22 @@ namespace ClubManager.ViewModels
                     if (exitoso)
                     {
                         await LogAction($"Impresas {selectedItems.Count} tarjetas en lote");
+
+                        // Actualizar estado de impreso si está configurado
+                        var configuracion = _configuracionService.GetConfiguracion();
+                        if (configuracion.ConfiguracionImpresion.MarcarComoImpresoAutomaticamente)
+                        {
+                            foreach (var item in selectedItems)
+                            {
+                                item.Abonado.Impreso = true;
+                                item.NotifyPropertyChanged(nameof(item.Abonado));
+                            }
+                            await _dbContext.SaveChangesAsync();
+                        }
+
                         MessageBox.Show($"{selectedItems.Count} tarjetas enviadas a impresora correctamente.",
                                       "Impresión completada", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                        // Actualizar estado de impreso
                         LoadData(); // Refrescar vista
                     }
                     else
@@ -843,6 +915,7 @@ namespace ClubManager.ViewModels
                               MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
         #endregion
     }
 
@@ -900,6 +973,4 @@ namespace ClubManager.ViewModels
             return Texto;
         }
     }
-
-
 }

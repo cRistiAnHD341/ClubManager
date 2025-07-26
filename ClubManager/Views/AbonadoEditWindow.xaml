@@ -97,6 +97,7 @@
                         <Label Content="Fecha de Nacimiento:" Style="{StaticResource ModernLabel}"/>
                         <DatePicker Style="{StaticResource ModernDatePicker}"
                                     SelectedDate="{Binding FechaNacimiento}"
+                                    Padding="8, 0, 0, 0"
                                     Margin="0,5,0,15"/>
 
                         <!-- Código de Barras -->

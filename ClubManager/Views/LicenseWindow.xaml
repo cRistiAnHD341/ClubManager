@@ -30,7 +30,7 @@
                 <GroupBox Header="📊 Estado Actual de la Licencia" Margin="0,0,0,30">
                     <StackPanel Margin="15">
                         <Border Background="{Binding StatusColor}" 
-                                CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                                CornerRadius="8" Margin="0,0,0,15">
                             <TextBlock Text="{Binding StatusMessage}" 
                                        FontSize="16" FontWeight="Bold" 
                                        Foreground="White" 

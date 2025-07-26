@@ -45,7 +45,7 @@ namespace ClubManager
         private void InitializeServices()
         {
             // Inicializar servicios singleton
-            var themeService = ThemeService.Instance;
+            ///var themeService = ThemeService.Instance;
 
             // Configurar directorio de datos
             var dataDirectory = Path.Combine(
