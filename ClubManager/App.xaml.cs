@@ -26,6 +26,8 @@ namespace ClubManager
                 // Verificar licencia
                 await CheckLicense();
 
+                var templateService = new TemplateService();
+
                 // Crear y mostrar ventana principal
                 var mainWindow = new MainWindow();
                 mainWindow.Show();

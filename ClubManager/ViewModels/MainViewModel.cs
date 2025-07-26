@@ -248,19 +248,25 @@ namespace ClubManager.ViewModels
             StatusMessage = "Configuración";
         }
 
+        #region Método para abrir diseñador (Agregar a la clase AbonadosViewModel)
+
         private void ShowCardDesigner()
         {
             try
             {
-                CurrentView = new CardDesignerView();
-                StatusMessage = "Diseñador de tarjetas abierto";
+                var designerWindow = new CardDesignerWindow();
+                designerWindow.Owner = Application.Current.MainWindow;
+                designerWindow.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al abrir diseñador: {ex.Message}", "Error",
+                MessageBox.Show($"Error al abrir diseñador de tarjetas: {ex.Message}", "Error",
                               MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        #endregion
+
 
         private void ChangeLicense()
         {

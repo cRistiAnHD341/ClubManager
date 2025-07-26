@@ -388,5 +388,426 @@ namespace ClubManager.Converters
                 throw new NotImplementedException();
             }
         }
+
+        public class TipoElementoToIconConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is string tipo)
+                {
+                    return tipo switch
+                    {
+                        "Texto" => "📝",
+                        "Imagen" => "🖼️",
+                        "Código" => "📊",
+                        "Campo Dinámico" => "🏷️",
+                        _ => "❓"
+                    };
+                }
+                return "❓";
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte boolean a Visibility invirtiendo el valor
+        /// </summary>
+        public class InvertBooleanToVisibilityConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is bool boolValue)
+                {
+                    return boolValue ? Visibility.Collapsed : Visibility.Visible;
+                }
+                return Visibility.Visible;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is Visibility visibility)
+                {
+                    return visibility != Visibility.Visible;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Convierte boolean a FontWeight
+        /// </summary>
+        public class BooleanToFontWeightConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is bool isBold && isBold)
+                {
+                    return FontWeights.Bold;
+                }
+                return FontWeights.Normal;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is FontWeight fontWeight)
+                {
+                    return fontWeight == FontWeights.Bold;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Convierte boolean a FontStyle
+        /// </summary>
+        public class BooleanToFontStyleConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is bool isItalic && isItalic)
+                {
+                    return FontStyles.Italic;
+                }
+                return FontStyles.Normal;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is FontStyle fontStyle)
+                {
+                    return fontStyle == FontStyles.Italic;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Convierte Color de System.Windows.Media a Brush
+        /// </summary>
+        public class ColorToBrushConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is System.Windows.Media.Color color)
+                {
+                    return new System.Windows.Media.SolidColorBrush(color);
+                }
+                return System.Windows.Media.Brushes.Black;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is System.Windows.Media.SolidColorBrush brush)
+                {
+                    return brush.Color;
+                }
+                return System.Windows.Media.Colors.Black;
+            }
+        }
+
+        /// <summary>
+        /// Convierte boolean a Visibility
+        /// </summary>
+        public class BooleanToVisibilityConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is bool boolValue)
+                {
+                    // Verificar si el parámetro es "Invert" para invertir la lógica
+                    bool invert = parameter?.ToString()?.ToLower() == "invert";
+
+                    if (invert)
+                    {
+                        return boolValue ? Visibility.Collapsed : Visibility.Visible;
+                    }
+                    else
+                    {
+                        return boolValue ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                }
+                return Visibility.Visible;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is Visibility visibility)
+                {
+                    bool invert = parameter?.ToString()?.ToLower() == "invert";
+
+                    if (invert)
+                    {
+                        return visibility != Visibility.Visible;
+                    }
+                    else
+                    {
+                        return visibility == Visibility.Visible;
+                    }
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Convierte valores numéricos a string con formato específico
+        /// </summary>
+        public class NumericFormatConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value == null) return string.Empty;
+
+                string format = parameter?.ToString() ?? "F2";
+
+                if (value is double doubleValue)
+                {
+                    return doubleValue.ToString(format, culture);
+                }
+                if (value is float floatValue)
+                {
+                    return floatValue.ToString(format, culture);
+                }
+                if (value is decimal decimalValue)
+                {
+                    return decimalValue.ToString(format, culture);
+                }
+                if (value is int intValue)
+                {
+                    return intValue.ToString(format, culture);
+                }
+
+                return value.ToString() ?? string.Empty;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is string stringValue && !string.IsNullOrWhiteSpace(stringValue))
+                {
+                    if (targetType == typeof(double) || targetType == typeof(double?))
+                    {
+                        if (double.TryParse(stringValue, NumberStyles.Float, culture, out double result))
+                            return result;
+                    }
+                    else if (targetType == typeof(float) || targetType == typeof(float?))
+                    {
+                        if (float.TryParse(stringValue, NumberStyles.Float, culture, out float result))
+                            return result;
+                    }
+                    else if (targetType == typeof(decimal) || targetType == typeof(decimal?))
+                    {
+                        if (decimal.TryParse(stringValue, NumberStyles.Float, culture, out decimal result))
+                            return result;
+                    }
+                    else if (targetType == typeof(int) || targetType == typeof(int?))
+                    {
+                        if (int.TryParse(stringValue, NumberStyles.Integer, culture, out int result))
+                            return result;
+                    }
+                }
+
+                return Binding.DoNothing;
+            }
+        }
+
+        /// <summary>
+        /// Convierte porcentaje a string con formato de porcentaje
+        /// </summary>
+        public class PercentageToStringConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is double doubleValue)
+                {
+                    return (doubleValue * 100).ToString("F0", culture) + "%";
+                }
+                return "0%";
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is string stringValue)
+                {
+                    stringValue = stringValue.Replace("%", "").Trim();
+                    if (double.TryParse(stringValue, NumberStyles.Float, culture, out double result))
+                    {
+                        return result / 100.0;
+                    }
+                }
+                return 0.0;
+            }
+        }
+
+        /// <summary>
+        /// Convierte múltiples valores boolean usando operador AND
+        /// </summary>
+        public class MultiBooleanAndConverter : IMultiValueConverter
+        {
+            public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (values == null || values.Length == 0)
+                    return false;
+
+                foreach (var value in values)
+                {
+                    if (value is bool boolValue && !boolValue)
+                        return false;
+                    if (value == DependencyProperty.UnsetValue)
+                        return false;
+                }
+
+                return true;
+            }
+
+            public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte múltiples valores boolean usando operador OR
+        /// </summary>
+        public class MultiBooleanOrConverter : IMultiValueConverter
+        {
+            public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (values == null || values.Length == 0)
+                    return false;
+
+                foreach (var value in values)
+                {
+                    if (value is bool boolValue && boolValue)
+                        return true;
+                }
+
+                return false;
+            }
+
+            public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte un objeto null a boolean
+        /// </summary>
+        public class NullToBooleanConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                bool invert = parameter?.ToString()?.ToLower() == "invert";
+                bool isNull = value == null;
+
+                return invert ? isNull : !isNull;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte string vacío o null a Visibility
+        /// </summary>
+        public class StringToVisibilityConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                bool invert = parameter?.ToString()?.ToLower() == "invert";
+                bool isEmpty = string.IsNullOrWhiteSpace(value?.ToString());
+
+                if (invert)
+                {
+                    return isEmpty ? Visibility.Visible : Visibility.Collapsed;
+                }
+                else
+                {
+                    return isEmpty ? Visibility.Collapsed : Visibility.Visible;
+                }
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte el tamaño en bytes a texto legible
+        /// </summary>
+        public class FileSizeConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is long bytes)
+                {
+                    string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+                    double len = bytes;
+                    int order = 0;
+
+                    while (len >= 1024 && order < sizes.Length - 1)
+                    {
+                        order++;
+                        len = len / 1024;
+                    }
+
+                    return $"{len:0.##} {sizes[order]}";
+                }
+
+                if (value is int intBytes)
+                {
+                    return Convert((long)intBytes, targetType, parameter, culture);
+                }
+
+                return "0 B";
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Convierte DateTime a string con formato relativo (hace X tiempo)
+        /// </summary>
+        public class RelativeTimeConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is DateTime dateTime)
+                {
+                    var timeSpan = DateTime.Now - dateTime;
+
+                    if (timeSpan.TotalMinutes < 1)
+                        return "Ahora mismo";
+                    if (timeSpan.TotalMinutes < 60)
+                        return $"Hace {(int)timeSpan.TotalMinutes} minuto(s)";
+                    if (timeSpan.TotalHours < 24)
+                        return $"Hace {(int)timeSpan.TotalHours} hora(s)";
+                    if (timeSpan.TotalDays < 7)
+                        return $"Hace {(int)timeSpan.TotalDays} día(s)";
+                    if (timeSpan.TotalDays < 30)
+                        return $"Hace {(int)(timeSpan.TotalDays / 7)} semana(s)";
+                    if (timeSpan.TotalDays < 365)
+                        return $"Hace {(int)(timeSpan.TotalDays / 30)} mes(es)";
+
+                    return $"Hace {(int)(timeSpan.TotalDays / 365)} año(s)";
+                }
+
+                return value?.ToString() ?? string.Empty;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
     }
 }

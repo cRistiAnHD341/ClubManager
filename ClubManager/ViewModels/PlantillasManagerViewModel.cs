@@ -200,7 +200,7 @@ namespace ClubManager.ViewModels
             try
             {
                 // Cargar plantilla en el diseñador
-                var cardDesigner = new CardDesignerView();
+                var cardDesigner = new CardDesignerWindow();
                 // TODO: Pasar la plantilla al diseñador para editarla
                 //cardDesigner.ShowDialog();
 
@@ -396,9 +396,9 @@ namespace ClubManager.ViewModels
                     Alto = imagen.Alto,
                     ZIndex = imagen.ZIndex,
                     RutaImagen = imagen.RutaImagen,
-                    Stretch = imagen.Stretch
+                    //Stretch = imagen.Stretch
                 },
-                ElementoCodigo codigo => new ElementoCodigo
+                /*ElementoCodigo codigo => new ElementoCodigo
                 {
                     Id = Guid.NewGuid().ToString(),
                     X = codigo.X,
@@ -409,7 +409,7 @@ namespace ClubManager.ViewModels
                     TipoCodigo = codigo.TipoCodigo,
                     CampoOrigen = codigo.CampoOrigen
                 },
-                _ => original
+                _ => original*/
             };
         }
 

@@ -176,6 +176,10 @@ namespace ClubManager.ViewModels
         public ICommand MarkSelectedAsNotPrintedCommand { get; private set; } = null!;
         public ICommand ClearSelectionCommand { get; private set; } = null!;
 
+        // Comandos Impresion ATarjetas
+        public ICommand PrintCardCommand { get; private set; } = null!;
+        public ICommand PrintSelectedCardsCommand { get; private set; } = null!;
+
         private void InitializeCommands()
         {
             NewAbonadoCommand = new RelayCommand(NewAbonado, () => CanEdit);
@@ -186,6 +190,8 @@ namespace ClubManager.ViewModels
             ClearFiltersCommand = new RelayCommand(ClearFilters);
             ExportCommand = new RelayCommand(ExportData);
             PrintSelectedCommand = new RelayCommand(PrintSelected, () => SelectedAbonado != null);
+            PrintCardCommand = new RelayCommand<AbonadoSelectableViewModel>(PrintCard, a => a != null);
+            PrintSelectedCardsCommand = new RelayCommand(PrintSelectedCards, () => HasSelectedItems);
 
             // Comandos múltiples
             DeleteSelectedCommand = new RelayCommand(DeleteSelected, () => CanEdit && HasSelectedItems);
@@ -727,6 +733,117 @@ namespace ClubManager.ViewModels
         }
 
         #endregion
+
+        #region Métodos de Impresión
+
+        private async void PrintCard(AbonadoSelectableViewModel? abonadoVm)
+        {
+            if (abonadoVm?.Abonado == null) return;
+
+            try
+            {
+                // Cargar plantilla predeterminada
+                var templateService = new TemplateService();
+                var plantilla = await templateService.GetPlantillaPredeterminadaAsync();
+
+                if (plantilla == null)
+                {
+                    MessageBox.Show("No hay plantilla predeterminada configurada. Abra el diseñador para crear una.",
+                                  "Sin plantilla", MessageBoxButton.OK, MessageBoxImage.Information);
+                    OpenCardDesigner();
+                    return;
+                }
+
+                // Crear servicio de impresión
+                var printService = new CardPrintService(templateService);
+
+                // Mostrar vista previa antes de imprimir
+                var previewWindow = new CardPreviewWindow(abonadoVm.Abonado, plantilla, printService);
+                previewWindow.Owner = Application.Current.MainWindow;
+
+                if (previewWindow.ShowDialog() == true)
+                {
+                    // El usuario confirmó la impresión desde la vista previa
+                    await LogAction($"Impresa tarjeta de {abonadoVm.Abonado.NombreCompleto}");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al imprimir tarjeta: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void PrintSelectedCards()
+        {
+            var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
+            if (!selectedItems.Any()) return;
+
+            try
+            {
+                var templateService = new TemplateService();
+                var plantilla = await templateService.GetPlantillaPredeterminadaAsync();
+
+                if (plantilla == null)
+                {
+                    MessageBox.Show("No hay plantilla predeterminada configurada. Abra el diseñador para crear una.",
+                                  "Sin plantilla", MessageBoxButton.OK, MessageBoxImage.Information);
+                    OpenCardDesigner();
+                    return;
+                }
+
+
+                var printService = new CardPrintService(templateService);
+                var abonados = selectedItems.Select(vm => vm.Abonado).ToList();
+
+                var result = MessageBox.Show(
+                    $"¿Desea imprimir {selectedItems.Count} tarjetas?",
+                    "Confirmar Impresión",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    var exitoso = await printService.ImprimirTarjetasAsync(abonados, plantilla);
+
+                    if (exitoso)
+                    {
+                        await LogAction($"Impresas {selectedItems.Count} tarjetas en lote");
+                        MessageBox.Show($"{selectedItems.Count} tarjetas enviadas a impresora correctamente.",
+                                      "Impresión completada", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        // Actualizar estado de impreso
+                        LoadData(); // Refrescar vista
+                    }
+                    else
+                    {
+                        MessageBox.Show("Error durante la impresión de las tarjetas.", "Error",
+                                      MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al imprimir tarjetas: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenCardDesigner()
+        {
+            try
+            {
+                var designerWindow = new CardDesignerWindow();
+                designerWindow.Owner = Application.Current.MainWindow;
+                designerWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al abrir diseñador de tarjetas: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        #endregion
     }
 
     // ViewModel para elementos seleccionables
@@ -783,4 +900,6 @@ namespace ClubManager.ViewModels
             return Texto;
         }
     }
+
+
 }
