@@ -776,10 +776,30 @@ namespace ClubManager.ViewModels
 
                 if (plantilla == null)
                 {
-                    MessageBox.Show("No hay plantilla predeterminada configurada. Abra el diseñador para crear una.",
-                                  "Sin plantilla", MessageBoxButton.OK, MessageBoxImage.Information);
-                    OpenCardDesigner();
-                    return;
+                    var result = MessageBox.Show(
+                        "No hay plantilla predeterminada configurada.\n\n" +
+                        "¿Desea abrir el diseñador para crear o seleccionar una plantilla?",
+                        "Sin plantilla",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Information);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        await OpenCardDesignerAsync();
+
+                        // Intentar cargar plantilla nuevamente después del diseñador
+                        plantilla = await templateService.GetPlantillaPredeterminadaAsync();
+                        if (plantilla == null)
+                        {
+                            MessageBox.Show("No se pudo obtener una plantilla válida para imprimir.", "Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
 
                 // Crear servicio de impresión
@@ -801,6 +821,19 @@ namespace ClubManager.ViewModels
                     RutaCopia = configuracion.ConfiguracionImpresion.RutaCopiasDigitales
                 };
 
+                // Mostrar información de la plantilla que se va a usar
+                var resultConfirm = MessageBox.Show(
+                    $"Se imprimirá la tarjeta usando la plantilla:\n\n" +
+                    $"📄 {plantilla.Nombre}\n" +
+                    $"📝 {plantilla.Descripcion}\n" +
+                    $"👤 Abonado: {abonadoVm.Abonado.NombreCompleto}\n\n" +
+                    "¿Continuar con la impresión?",
+                    "Confirmar Impresión",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (resultConfirm != MessageBoxResult.Yes) return;
+
                 // Imprimir
                 var resultado = await printService.ImprimirTarjetaAsync(abonadoVm.Abonado, plantilla, configuracionImpresion);
 
@@ -814,10 +847,11 @@ namespace ClubManager.ViewModels
                         abonadoVm.NotifyPropertyChanged(nameof(abonadoVm.Abonado));
                     }
 
-                    await LogAction($"Impresa tarjeta de {abonadoVm.Abonado.NombreCompleto}");
+                    await LogAction($"Impresa tarjeta de {abonadoVm.Abonado.NombreCompleto} usando plantilla {plantilla.Nombre}");
 
                     MessageBox.Show($"✅ Tarjeta impresa correctamente!\n\n" +
                                    $"• Abonado: {abonadoVm.Abonado.NombreCompleto}\n" +
+                                   $"• Plantilla: {plantilla.Nombre}\n" +
                                    $"• Tiempo: {resultado.TiempoTranscurrido.TotalSeconds:F1} segundos",
                                    "Impresión Exitosa", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -835,6 +869,8 @@ namespace ClubManager.ViewModels
             }
         }
 
+        // Actualización del método PrintSelectedCards en AbonadosViewModel.cs
+
         private async void PrintSelectedCards()
         {
             var selectedItems = AbonadosFiltered.Where(a => a.IsSelected).ToList();
@@ -847,18 +883,41 @@ namespace ClubManager.ViewModels
 
                 if (plantilla == null)
                 {
-                    MessageBox.Show("No hay plantilla predeterminada configurada. Abra el diseñador para crear una.",
-                                  "Sin plantilla", MessageBoxButton.OK, MessageBoxImage.Information);
-                    OpenCardDesigner();
-                    return;
+                    var resultado = MessageBox.Show(
+                        "No hay plantilla predeterminada configurada.\n\n" +
+                        "¿Desea abrir el diseñador para crear o seleccionar una plantilla?",
+                        "Sin plantilla",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Information);
+
+                    if (resultado == MessageBoxResult.Yes)
+                    {
+                        await OpenCardDesignerAsync();
+
+                        // Intentar cargar plantilla nuevamente
+                        plantilla = await templateService.GetPlantillaPredeterminadaAsync();
+                        if (plantilla == null)
+                        {
+                            MessageBox.Show("No se pudo obtener una plantilla válida para imprimir.", "Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
 
                 var printService = new CardPrintService(templateService, _configuracionService);
                 var abonados = selectedItems.Select(vm => vm.Abonado).ToList();
 
                 var result = MessageBox.Show(
-                    $"¿Desea imprimir {selectedItems.Count} tarjetas?",
-                    "Confirmar Impresión",
+                    $"Se imprimirán {selectedItems.Count} tarjetas usando:\n\n" +
+                    $"📄 Plantilla: {plantilla.Nombre}\n" +
+                    $"📝 {plantilla.Descripcion}\n\n" +
+                    "¿Continuar con la impresión?",
+                    "Confirmar Impresión Múltiple",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -868,7 +927,7 @@ namespace ClubManager.ViewModels
 
                     if (exitoso)
                     {
-                        await LogAction($"Impresas {selectedItems.Count} tarjetas en lote");
+                        await LogAction($"Impresas {selectedItems.Count} tarjetas en lote usando plantilla {plantilla.Nombre}");
 
                         // Actualizar estado de impreso si está configurado
                         var configuracion = _configuracionService.GetConfiguracion();
@@ -882,7 +941,8 @@ namespace ClubManager.ViewModels
                             await _dbContext.SaveChangesAsync();
                         }
 
-                        MessageBox.Show($"{selectedItems.Count} tarjetas enviadas a impresora correctamente.",
+                        MessageBox.Show($"✅ {selectedItems.Count} tarjetas impresas correctamente!\n\n" +
+                                      $"📄 Plantilla utilizada: {plantilla.Nombre}",
                                       "Impresión completada", MessageBoxButton.OK, MessageBoxImage.Information);
 
                         LoadData(); // Refrescar vista
@@ -900,12 +960,16 @@ namespace ClubManager.ViewModels
                               MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-        private void OpenCardDesigner()
+        private async void OpenCardDesigner()
         {
             try
             {
-                var designerWindow = new CardDesignerWindow();
+                // Obtener la plantilla predeterminada actual
+                var templateService = new TemplateService();
+                var plantillaPredeterminada = await templateService.GetPlantillaPredeterminadaAsync();
+
+                // Abrir el diseñador con la plantilla predeterminada
+                var designerWindow = new CardDesignerWindow(plantillaPredeterminada);
                 designerWindow.Owner = Application.Current.MainWindow;
                 designerWindow.ShowDialog();
             }
@@ -915,6 +979,25 @@ namespace ClubManager.ViewModels
                               MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private async Task OpenCardDesignerAsync()
+        {
+            try
+            {
+                var templateService = new TemplateService();
+                var plantillaPredeterminada = await templateService.GetPlantillaPredeterminadaAsync();
+
+                var designerWindow = new CardDesignerWindow(plantillaPredeterminada);
+                designerWindow.Owner = Application.Current.MainWindow;
+                designerWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al abrir diseñador de tarjetas: {ex.Message}", "Error",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
 
         #endregion
     }

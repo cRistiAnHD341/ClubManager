@@ -1,6 +1,7 @@
 ﻿using ClubManager.Data;
 using ClubManager.Models;
 using ClubManager.ViewModels;
+using ClubManager.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,6 +39,9 @@ namespace ClubManager.Views
         private Size _originalSize;
         private Point _originalPosition;
 
+        // Servicios
+        private readonly ITemplateService _templateService;
+
         private enum ResizeMode
         {
             None,
@@ -51,23 +55,53 @@ namespace ClubManager.Views
             Left
         }
 
-        public CardDesignerWindow()
+        public CardDesignerWindow(PlantillaTarjeta? plantillaInicial = null)
         {
             InitializeComponent();
 
-            // Inicializar ViewModel antes del Loaded
-            _viewModel = new CardDesignerViewModel();
+            // Inicializar servicios
+            _templateService = new TemplateService();
+
+            // Inicializar ViewModel
+            _viewModel = new CardDesignerViewModel(_templateService);
             DataContext = _viewModel;
 
             // Agregar teclas de acceso rápido
             KeyDown += CardDesignerWindow_KeyDown;
 
             Loaded += OnLoaded;
+
+            // Si se pasa una plantilla inicial, cargarla
+            if (plantillaInicial != null)
+            {
+                _viewModel.CargarPlantilla(plantillaInicial);
+            }
+            else
+            {
+                // Cargar plantilla predeterminada
+                _ = CargarPlantillaPredeterminadaAsync();
+            }
         }
 
-        public CardDesignerWindow(ClubDbContext? dbContext = null) : this()
+        /*public CardDesignerWindow(ClubDbContext? dbContext = null) : this()
         {
-            // El ViewModel ya se inicializó en el constructor principal
+            // Constructor para compatibilidad
+        }*/
+
+        private async System.Threading.Tasks.Task CargarPlantillaPredeterminadaAsync()
+        {
+            try
+            {
+                var plantillaPredeterminada = await _templateService.GetPlantillaPredeterminadaAsync();
+                if (plantillaPredeterminada != null && _viewModel != null)
+                {
+                    _viewModel.CargarPlantilla(plantillaPredeterminada);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error cargando plantilla predeterminada: {ex.Message}");
+            }
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -168,6 +202,11 @@ namespace ClubManager.Views
 
                     case Key.N when Keyboard.Modifiers == ModifierKeys.Control:
                         _viewModel.NuevaPlantillaCommand.Execute(null);
+                        e.Handled = true;
+                        break;
+
+                    case Key.A when Keyboard.Modifiers == ModifierKeys.Control:
+                        _viewModel.AplicarPlantillaCommand.Execute(null);
                         e.Handled = true;
                         break;
 
@@ -336,6 +375,7 @@ namespace ClubManager.Views
                 System.Diagnostics.Debug.WriteLine($"Error en MouseDown: {ex.Message}");
             }
         }
+
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
             try
@@ -974,6 +1014,7 @@ namespace ClubManager.Views
         }
 
         #endregion
+
         #region Métodos de Utilidad
 
         private ElementoTarjeta? EncontrarElementoPorUI(UIElement uiElement)
@@ -1740,48 +1781,6 @@ namespace ClubManager.Views
             }
         }
 
-        private void AgregarComboBox(string etiqueta, string valorActual, string[] opciones, Action<string> onChange)
-        {
-            try
-            {
-                var label = new TextBlock
-                {
-                    Text = etiqueta,
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 5, 0, 2)
-                };
-                PropiedadesPanel.Children.Add(label);
-
-                var comboBox = new ComboBox
-                {
-                    FontSize = 12,
-                    Height = 25,
-                    Margin = new Thickness(0, 2, 0, 10),
-                    Background = Brushes.White
-                };
-
-                foreach (var opcion in opciones)
-                {
-                    comboBox.Items.Add(opcion);
-                }
-
-                comboBox.SelectedItem = valorActual;
-
-                comboBox.SelectionChanged += (s, e) =>
-                {
-                    onChange(comboBox.SelectedItem?.ToString() ?? valorActual);
-                };
-
-                PropiedadesPanel.Children.Add(comboBox);
-                System.Diagnostics.Debug.WriteLine($"ComboBox agregado: {etiqueta}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error agregando combobox: {ex.Message}");
-            }
-        }
-
         private void CambiarImagen(ElementoImagen imagen)
         {
             try
@@ -1851,7 +1850,7 @@ namespace ClubManager.Views
 
         #region Eventos de la Ventana
 
-        private void CerrarVentana_Click(object sender, RoutedEventArgs e)
+        private async void CerrarVentana_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1867,7 +1866,8 @@ namespace ClubManager.Views
                     switch (result)
                     {
                         case MessageBoxResult.Yes:
-                            _viewModel.GuardarPlantillaCommand.Execute(null);
+                            // Guardar la plantilla actual como predeterminada
+                            await _viewModel.GuardarYAplicarPlantillaAsync();
                             break;
                         case MessageBoxResult.Cancel:
                             return; // No cerrar
